@@ -87,8 +87,19 @@ jobs:
         # only re-download the browser binary itself is what the cache
         # actually saves.
 
+      - name: Resolve installed Chromium path
+        id: chromium
+        # apps/scanner-worker's integration test is opt-in via
+        # describe.skipIf(!process.env.UI_SCAN_CHROMIUM_PATH) — without
+        # this it silently skips in CI instead of actually running.
+        run: |
+          PATH_OUT=$(node -e "console.log(require('playwright-core').chromium.executablePath())")
+          echo "path=$PATH_OUT" >> "$GITHUB_OUTPUT"
+
       - name: Type-check & build all workspaces
         run: npm run build
 
       - name: "Run full test suite (184+ tests: unit + real DB/Redis/Chromium integration)"
         run: npm test
+        env:
+          UI_SCAN_CHROMIUM_PATH: ${{ steps.chromium.outputs.path }}

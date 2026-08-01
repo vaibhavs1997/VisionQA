@@ -6,3 +6,8 @@ scan-output/
 apps/api/data/
 .DS_Store
 *.log
+.env
+.env.*
+!.env.example
+coverage/
+*.pem
