@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same branch/PR so pushes during review
+# don't queue up a backlog of stale jobs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build & test (real Postgres + Redis + Chromium)
+    runs-on: ubuntu-latest
+
+    # Real infrastructure, not mocks — this mirrors how the test suite is
+    # actually written (see packages/database, packages/queue,
+    # apps/api, apps/scanner-worker: every "integration" test connects to
+    # a real service and is explicitly not skipped/mocked).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ui_quality_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Both naming conventions used across the test suite point at the
+      # same service — see packages/database (TEST_DATABASE_URL),
+      # apps/api and apps/scanner-worker (also TEST_DATABASE_URL, just
+      # with a different default credential baked in when unset).
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/ui_quality_test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/ui_quality_test
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: ci-only-secret-do-not-use-in-prod
+      STORAGE_SIGNING_SECRET: ci-only-secret-do-not-use-in-prod
+      NODE_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Cache the downloaded browser binary across runs — it's the
+      # slowest single step otherwise (a full Chromium + system libs
+      # download on every run).
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Chromium (with system deps)
+        run: npx playwright install --with-deps chromium
+        # --with-deps still needs to run even on a cache hit, since the
+        # apt-level system libraries aren't part of the cached path —
+        # only re-download the browser binary itself is what the cache
+        # actually saves.
+
+      - name: Type-check & build all workspaces
+        run: npm run build
+
+      - name: "Run full test suite (184+ tests: unit + real DB/Redis/Chromium integration)"
+        run: npm test
