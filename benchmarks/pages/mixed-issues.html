@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mixed Issues Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 16px; }
+    .wide-block { width: 900px; height: 100px; background: #f59e0b; }
+  </style>
+</head>
+<body>
+  <h1>Mixed Issues Benchmark Page</h1>
+
+  <!-- broken image -->
+  <img src="/broken/asset-1.png" alt="Section illustration" style="width:300px;height:200px;" />
+
+  <!-- missing alt -->
+  <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+       style="width:300px;height:200px;" />
+
+  <!-- placeholder content -->
+  <p>Lorem ipsum dolor sit amet placeholder paragraph for this section.</p>
+
+  <!-- horizontal overflow contributor -->
+  <div class="wide-block"></div>
+</body>
+</html>

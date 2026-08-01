@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.tsbuildinfo
+scan-output/
+.next/
+apps/api/data/
+.DS_Store
+*.log

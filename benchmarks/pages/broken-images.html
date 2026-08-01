@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Broken Images Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 24px; }
+    .hero { width: 100%; max-width: 800px; height: 300px; object-fit: cover; display: block; }
+    .product-card { width: 240px; height: 180px; display: inline-block; margin: 8px; }
+    .icon { width: 16px; height: 16px; }
+  </style>
+</head>
+<body>
+  <h1>Broken Images Benchmark Page</h1>
+
+  <!-- Case 1: broken URL -> 404, should be flagged critical -->
+  <img class="hero" src="/assets/does-not-exist-hero.jpg" alt="Hero banner" />
+
+  <!-- Case 2: empty src attribute, should be flagged medium -->
+  <img class="product-card" src="" alt="Product thumbnail" />
+
+  <!-- Case 3: a working, real inline image (should NOT be flagged) -->
+  <img class="product-card"
+       src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+       alt="Valid inline pixel" />
+
+  <!-- Case 4: small decorative icon with broken src -> should be lower severity due to small area -->
+  <img class="icon" src="/icons/missing-icon.svg" alt="" />
+</body>
+</html>

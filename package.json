@@ -1,0 +1,22 @@
+{
+  "name": "ui-quality-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Phase 0 — AI-Powered UI Quality Platform: technical feasibility CLI scanner",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=@ui-quality/shared && npm run build --workspace=@ui-quality/detectors --workspace=@ui-quality/issue-engine --workspace=@ui-quality/scanner-core --workspace=@ui-quality/ai-engine --workspace=@ui-quality/ocr --workspace=@ui-quality/database --workspace=@ui-quality/queue --workspace=@ui-quality/storage --workspace=@ui-quality/observability && npm run build --workspace=@ui-quality/cli --workspace=@ui-quality/api --workspace=@ui-quality/scanner-worker && npm run build --workspace=@ui-quality/web",
+    "scan": "tsx apps/cli/src/index.ts",
+    "benchmark": "tsx benchmarks/src/run-benchmark.ts",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "tsx": "^4.16.5",
+    "vitest": "^2.0.5",
+    "@types/node": "^22.5.0"
+  }
+}

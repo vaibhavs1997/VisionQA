@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Phase 1 Content Issues Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 16px; }
+    .product-card { width: 280px; height: 220px; border: 1px solid #ddd; padding: 12px; margin-bottom: 16px; }
+    .cta-button { padding: 10px 20px; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <h1>Phase 1 Content Issues Benchmark Page</h1>
+
+  <!-- empty-component: card-classed container, meaningfully sized, no text/media content -->
+  <div class="product-card"></div>
+
+  <!-- control: a properly populated card -->
+  <div class="product-card">
+    <h3>Wireless Headphones</h3>
+    <p>Noise-cancelling, 30-hour battery life.</p>
+  </div>
+
+  <!-- unexpected-disabled-cta: primary action disabled, no loading indicator -->
+  <button class="cta-button" disabled>Checkout</button>
+
+  <!-- control: a disabled button that IS mid-submission (aria-busy) -->
+  <button class="cta-button" disabled aria-busy="true">Submit</button>
+</body>
+</html>

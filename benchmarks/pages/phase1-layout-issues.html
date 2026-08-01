@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Phase 1 Layout Issues Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 16px; }
+
+    /* Text clipping: fixed-height box, overflow hidden, no ellipsis/line-clamp */
+    .clip-box {
+      width: 300px;
+      height: 40px;
+      overflow: hidden;
+      border: 1px solid #ccc;
+      margin-bottom: 24px;
+    }
+
+    /* Text overflow: nowrap content wider than its box, overflow visible */
+    .overflow-box {
+      width: 150px;
+      white-space: nowrap;
+      overflow: visible;
+      border: 1px solid #ccc;
+      margin-bottom: 24px;
+    }
+
+    /* Element outside viewport: off-screen with no transform (unintentional) */
+    .offscreen-cta {
+      position: absolute;
+      left: -9999px;
+      top: 40px;
+      width: 200px;
+      height: 44px;
+      background: #4f46e5;
+      color: white;
+    }
+
+    /* Element overlap: two overlapping buttons, no z-index differentiation */
+    .overlap-wrapper {
+      position: relative;
+      height: 80px;
+      margin-top: 24px;
+    }
+    .btn-a {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 160px;
+      height: 44px;
+      background: #10b981;
+      color: white;
+      border: none;
+    }
+    .btn-b {
+      position: absolute;
+      left: 90px;
+      top: 10px;
+      width: 160px;
+      height: 44px;
+      background: #ef4444;
+      color: white;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Phase 1 Layout Issues Benchmark Page</h1>
+
+  <div class="clip-box">
+    <p>This paragraph contains much more text than the fixed-height clipping box above it can display, so a meaningful portion should be cut off entirely with no ellipsis to indicate truncation.</p>
+  </div>
+
+  <div class="overflow-box">
+    <span>this-is-a-very-long-unbroken-string-that-will-overflow-the-box</span>
+  </div>
+
+  <button class="offscreen-cta">Hidden Off-Screen Button</button>
+
+  <div class="overlap-wrapper">
+    <button class="btn-a">Save Changes</button>
+    <button class="btn-b">Cancel Action</button>
+  </div>
+</body>
+</html>

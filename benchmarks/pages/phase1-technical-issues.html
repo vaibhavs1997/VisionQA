@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Phase 1 Technical Issues Fixture</title>
+  <style>
+    @font-face {
+      font-family: "BrokenFont";
+      src: url("/fonts/does-not-exist.woff2") format("woff2");
+    }
+    body { font-family: sans-serif; margin: 0; padding: 16px; }
+    .broken-font-text { font-family: "BrokenFont", sans-serif; font-size: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Phase 1 Technical Issues Benchmark Page</h1>
+
+  <p class="broken-font-text">This text tries to use a font that fails to load.</p>
+
+  <!-- broken-svg-icon: empty svg with no shape children, marked as meaningful (role=img + aria-label) -->
+  <svg role="img" aria-label="Settings icon" width="24" height="24" viewBox="0 0 24 24"></svg>
+
+  <!-- control: a valid icon SVG with an actual shape -->
+  <svg role="img" aria-label="Checkmark icon" width="24" height="24" viewBox="0 0 24 24">
+    <path d="M4 12 L10 18 L20 6" stroke="black" fill="none"></path>
+  </svg>
+
+  <script>
+    // console-ui-error: first-party inline error
+    console.error("TypeError: cannot read property 'value' of undefined in checkout widget");
+  </script>
+</body>
+</html>

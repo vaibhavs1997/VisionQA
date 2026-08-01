@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Phase 1 Accessibility Issues Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 16px; background: #ffffff; }
+    .icon-btn { width: 32px; height: 32px; border: none; background: #eee; }
+    .low-contrast-text { color: #e5e5e5; background: #ffffff; font-size: 14px; }
+    .normal-contrast-text { color: #111111; background: #ffffff; font-size: 14px; }
+    label { display: block; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Phase 1 Accessibility Issues Benchmark Page</h1>
+
+  <!-- missing-form-label: no label, no aria-label, no placeholder -->
+  <input type="text" id="unlabeled-field" />
+
+  <!-- control: properly labeled field -->
+  <label for="labeled-field">Full name</label>
+  <input type="text" id="labeled-field" />
+
+  <!-- missing-accessible-name: icon-only button with an SVG, no aria-label -->
+  <button class="icon-btn">
+    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 2 L14 14"></path></svg>
+  </button>
+
+  <!-- control: icon-only button WITH aria-label -->
+  <button class="icon-btn" aria-label="Close menu">
+    <svg width="16" height="16" viewBox="0 0 16 16"><path d="M2 2 L14 14"></path></svg>
+  </button>
+
+  <!-- low-contrast-candidate: very light gray text on white -->
+  <p class="low-contrast-text">This text is nearly invisible against the white background behind it.</p>
+
+  <!-- control: normal contrast text -->
+  <p class="normal-contrast-text">This text has plenty of contrast against its background.</p>
+</body>
+</html>

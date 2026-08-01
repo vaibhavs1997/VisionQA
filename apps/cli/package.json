@@ -1,0 +1,22 @@
+{
+  "name": "@ui-quality/cli",
+  "version": "0.1.0",
+  "bin": {
+    "ui-scan": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@ui-quality/shared": "0.1.0",
+    "@ui-quality/scanner-core": "0.1.0",
+    "@ui-quality/detectors": "0.1.0",
+    "@ui-quality/issue-engine": "0.1.0",
+    "@ui-quality/ai-engine": "0.1.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.0"
+  }
+}

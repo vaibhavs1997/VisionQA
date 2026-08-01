@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Horizontal Overflow Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 16px; }
+    /* The offending element: fixed width wider than any mobile/desktop
+       viewport used in the benchmark, with no responsive constraint. */
+    .promo-banner {
+      width: 1200px;
+      height: 160px;
+      background: linear-gradient(90deg, #4f46e5, #06b6d4);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+    /* Intentional horizontal scroll container — should NOT be flagged,
+       per the "expected scroll container" exclusion rule. */
+    .carousel {
+      overflow-x: auto;
+      white-space: nowrap;
+      width: 100%;
+      height: 100px;
+      margin-top: 16px;
+    }
+    .carousel-item {
+      display: inline-block;
+      width: 200px;
+      height: 80px;
+      background: #ddd;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Horizontal Overflow Benchmark Page</h1>
+  <div class="promo-banner">This banner is intentionally too wide</div>
+
+  <div class="carousel">
+    <div class="carousel-item">Slide 1</div>
+    <div class="carousel-item">Slide 2</div>
+    <div class="carousel-item">Slide 3</div>
+    <div class="carousel-item">Slide 4</div>
+    <div class="carousel-item">Slide 5</div>
+  </div>
+</body>
+</html>

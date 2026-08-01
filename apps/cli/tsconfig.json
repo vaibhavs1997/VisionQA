@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/scanner-core" },
+    { "path": "../../packages/detectors" },
+    { "path": "../../packages/issue-engine" },
+    { "path": "../../packages/ai-engine" }
+  ],
+  "include": ["src"]
+}

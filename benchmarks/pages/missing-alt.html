@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Missing Alt Text Fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 24px; }
+    .content-image { width: 100%; max-width: 320px; height: 200px; display: block; margin-bottom: 16px; }
+    .icon { width: 20px; height: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Missing Alt Text Benchmark Page</h1>
+
+  <!-- Case 1: content image, no alt attribute at all -> should be flagged -->
+  <img class="content-image"
+       src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" />
+
+  <!-- Case 2: content image with meaningful alt -> should NOT be flagged -->
+  <img class="content-image"
+       src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+       alt="Team photo at the annual conference" />
+
+  <!-- Case 3: small icon with role=presentation -> should NOT be flagged (decorative) -->
+  <img class="icon" role="presentation"
+       src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" />
+
+  <!-- Case 4: small icon, empty alt (legitimate decorative pattern) -> should NOT be flagged -->
+  <img class="icon" alt=""
+       src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" />
+</body>
+</html>

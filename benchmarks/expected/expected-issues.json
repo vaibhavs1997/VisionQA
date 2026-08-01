@@ -1,0 +1,88 @@
+{
+  "broken-images.html": {
+    "expectedIssueTypes": [
+      "broken-image-network-error",
+      "broken-image-empty-src",
+      "failed-resource",
+      "console-ui-error"
+    ],
+    "minExpectedCount": 3,
+    "notes": "hero (404), empty-src product card, and small broken icon should all be flagged; the valid inline pixel must NOT be flagged. A 404'd image is correctly caught by both the image detector (broken-image-network-error) and the network detector (failed-resource) — this is intentional dual-category detection, not duplication, since Phase 0 does not yet cross-reference detector categories (that's a Phase 1 concern). Chromium also logs a first-party console error for the failed resource load, which console-ui-error correctly picks up as a third corroborating signal for the same root cause."
+  },
+  "horizontal-overflow.html": {
+    "expectedIssueTypes": ["horizontal-overflow"],
+    "minExpectedCount": 1,
+    "notes": "the 1200px promo banner should trigger page-level overflow; the .carousel (overflow-x:auto) must NOT be flagged as the culprit."
+  },
+  "placeholder-content.html": {
+    "expectedIssueTypes": ["placeholder-lorem-ipsum", "placeholder-generic-token"],
+    "minExpectedCount": 2,
+    "notes": "Lorem Ipsum heading/paragraph and the two TODO occurrences should be flagged."
+  },
+  "missing-alt.html": {
+    "expectedIssueTypes": ["missing-alt-text"],
+    "minExpectedCount": 1,
+    "notes": "only the no-alt content image should be flagged; the alt-present image, presentation-role icon, and empty-alt decorative icon must NOT be flagged."
+  },
+  "mixed-issues.html": {
+    "expectedIssueTypes": [
+      "broken-image-network-error",
+      "failed-resource",
+      "missing-alt-text",
+      "placeholder-lorem-ipsum",
+      "horizontal-overflow",
+      "console-ui-error"
+    ],
+    "minExpectedCount": 4,
+    "notes": "one planted defect per detector category on a single page; the broken image is correctly double-counted by the image and network detectors, and Chromium's own console error for the failed load is a third corroborating signal (see broken-images.html notes)."
+  },
+  "clean-page.html": {
+    "expectedIssueTypes": [],
+    "minExpectedCount": 0,
+    "notes": "false-positive control — no planted defects; any issue reported here counts against the false-positive rate."
+  },
+  "phase1-layout-issues.html": {
+    "expectedIssueTypes": [
+      "text-clipping",
+      "text-overflow",
+      "element-outside-viewport",
+      "element-overlap",
+      "horizontal-overflow",
+      "low-contrast-candidate"
+    ],
+    "minExpectedCount": 4,
+    "notes": "one planted defect per new Phase 1 layout detector: a fixed-height overflow:hidden box with no ellipsis/line-clamp, a nowrap span wider than its box with visible overflow, an absolutely-positioned button pushed off-screen with no transform, and two overlapping buttons with no z-index differentiation or overlay role. Two additional genuine findings on mobile: the unwrapped overflow-box span (427px) also widens the whole document past the 390px mobile viewport, correctly firing horizontal-overflow too; and the green/red overlap-test buttons (white text on #10b981/#ef4444) turn out to genuinely fail WCAG AA contrast (2.54:1 and 3.76:1 against the 4.5:1 minimum) — an accidental but real defect in this fixture's own color choices, not a detector false positive."
+  },
+  "phase1-accessibility-issues.html": {
+    "expectedIssueTypes": [
+      "missing-form-label",
+      "missing-accessible-name",
+      "low-contrast-candidate"
+    ],
+    "minExpectedCount": 3,
+    "notes": "an unlabeled text input, an icon-only button with no aria-label, and near-white-on-white text; the labeled field, aria-labeled icon button, and normal-contrast paragraph must NOT be flagged."
+  },
+  "phase1-technical-issues.html": {
+    "expectedIssueTypes": [
+      "font-load-failure",
+      "broken-svg-icon",
+      "console-ui-error",
+      "failed-resource"
+    ],
+    "minExpectedCount": 3,
+    "notes": "a @font-face pointing at a non-existent file (used by rendered text so the load is actually attempted), an empty <svg> with role/aria-label but no shape children, and a first-party console.error call; the valid checkmark SVG must NOT be flagged. The broken font file is correctly also caught by failed-resource (network-layer 404), the same intentional dual-detection pattern as broken images."
+  },
+  "phase1-content-issues.html": {
+    "expectedIssueTypes": [
+      "empty-component",
+      "unexpected-disabled-cta"
+    ],
+    "minExpectedCount": 2,
+    "notes": "an empty card-classed container and a disabled 'Checkout' button with no aria-busy/loading indicator; the populated card and the aria-busy disabled 'Submit' button must NOT be flagged."
+  },
+  "phase1-clean-page.html": {
+    "expectedIssueTypes": [],
+    "minExpectedCount": 0,
+    "notes": "false-positive control for all 12 Phase 1 detectors — exercises the exact intentional patterns each detector must exclude (line-clamp, ellipsis, role=dialog modal overlay, labeled field, aria-labeled icon button, high-contrast text, populated card, enabled CTA). Any issue reported here counts against the false-positive rate."
+  }
+}

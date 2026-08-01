@@ -1,0 +1,100 @@
+# Local/self-hosted deployment of the full stack. Run from the monorepo
+# root:
+#   docker compose -f infra/docker/docker-compose.yml up --build
+#
+# NOTE ON THIS PROJECT'S OWN DEVELOPMENT ENVIRONMENT: this compose file
+# was authored and reviewed, but not executed, in the sandbox this
+# project was built in — that sandbox has no Docker daemon available
+# (see README). Everything it orchestrates (Postgres, Redis, the API,
+# the worker, the web app) WAS independently verified working by running
+# each piece directly (via apt-installed Postgres/Redis and `node
+# dist/index.js`) rather than through Docker — see the "Verified live"
+# section of the README for exactly what was proven end-to-end. This
+# file is the containerized packaging of that same, already-verified
+# stack, not a separate untested path — but the act of `docker compose
+# up` itself has not been run. Treat it the same way as the
+# AnthropicProvider/S3Adapter honesty notes elsewhere in this project:
+# correctly written against a well-understood API, not blindly assumed
+# to work on the first try in every environment.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: uiquality
+      POSTGRES_PASSWORD: uiquality_dev
+      POSTGRES_DB: uiquality
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uiquality"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgres://uiquality:uiquality_dev@postgres:5432/uiquality
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set a real JWT_SECRET — see README}
+      STORAGE_SIGNING_SECRET: ${STORAGE_SIGNING_SECRET:?set a real STORAGE_SIGNING_SECRET — see README}
+      STORAGE_ROOT_DIR: /data/storage
+      WEB_ORIGIN: http://localhost:3000
+      PORT: "4000"
+    volumes:
+      - storage-data:/data/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  scanner-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/scanner-worker.Dockerfile
+    environment:
+      DATABASE_URL: postgres://uiquality:uiquality_dev@postgres:5432/uiquality
+      REDIS_URL: redis://redis:6379
+      STORAGE_SIGNING_SECRET: ${STORAGE_SIGNING_SECRET:?set a real STORAGE_SIGNING_SECRET — see README}
+      STORAGE_ROOT_DIR: /data/storage
+      WORKER_CONCURRENCY: "2"
+    volumes:
+      - storage-data:/data/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  storage-data:
