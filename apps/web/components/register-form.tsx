@@ -30,40 +30,48 @@ export function RegisterForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-lg border border-gray-200 bg-white p-6">
-      <h1 className="mb-4 text-lg font-semibold text-gray-900">Create an account</h1>
+    <form
+      onSubmit={handleSubmit}
+      className="viewfinder w-full max-w-sm rounded-lg border border-line bg-surface p-6 shadow-panel"
+    >
+      <span className="vf-br" />
+      <span className="vf-bl" />
+      <h1 className="mb-5 text-lg font-semibold text-ink">Create an account</h1>
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+        <label className="mb-1 block text-sm font-medium text-ink">Email</label>
         <input
           type="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="w-full rounded border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-signal focus:outline-none"
         />
       </div>
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+      <div className="mb-5">
+        <label className="mb-1 block text-sm font-medium text-ink">Password</label>
         <input
           type="password"
           required
           minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="w-full rounded border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-signal focus:outline-none"
         />
-        <p className="mt-1 text-xs text-gray-400">At least 8 characters.</p>
+        <p className="mt-1 font-mono text-xs text-ink-faint">min. 8 characters</p>
       </div>
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-critical">{error}</p>}
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="w-full rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink-soft disabled:opacity-50"
       >
-        {submitting ? "Creating account..." : "Create account"}
+        {submitting ? "Creating account…" : "Create account"}
       </button>
-      <p className="mt-4 text-center text-sm text-gray-500">
-        Already have an account? <a href="/login" className="text-blue-600 hover:underline">Log in</a>
+      <p className="mt-4 text-center text-sm text-ink-faint">
+        Already have an account?{" "}
+        <a href="/login" className="text-signal-ink hover:underline">
+          Log in
+        </a>
       </p>
     </form>
   );

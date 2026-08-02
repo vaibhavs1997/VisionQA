@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { clearClientToken } from "@/lib/session";
 
-export function LogoutButton() {
+export function LogoutButton({ variant = "light" }: { variant?: "light" | "dark" }) {
   const router = useRouter();
 
   function handleLogout() {
@@ -12,8 +12,10 @@ export function LogoutButton() {
     router.refresh();
   }
 
+  const colorClass = variant === "dark" ? "text-paper/50 hover:text-paper" : "text-ink-faint hover:text-ink";
+
   return (
-    <button type="button" onClick={handleLogout} className="text-sm text-gray-500 hover:text-gray-700">
+    <button type="button" onClick={handleLogout} className={`font-mono text-xs uppercase tracking-wide ${colorClass}`}>
       Log out
     </button>
   );

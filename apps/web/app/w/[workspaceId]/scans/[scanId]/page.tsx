@@ -18,28 +18,29 @@ export default async function ScanPage({
   const { scan, summary, pages } = await api.getScan(params.workspaceId, params.scanId);
   const isTerminal = TERMINAL_STATUSES.has(scan.status);
 
-  const { issues } = isTerminal
-    ? await api.getScanIssues(params.workspaceId, params.scanId, searchParams)
-    : { issues: [] };
+  const { issues } = isTerminal ? await api.getScanIssues(params.workspaceId, params.scanId, searchParams) : { issues: [] };
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href={`/w/${params.workspaceId}/projects/${scan.projectId}`} className="text-sm text-gray-500 hover:text-gray-700">
+        <Link
+          href={`/w/${params.workspaceId}/projects/${scan.projectId}`}
+          className="font-mono text-xs uppercase tracking-wide text-ink-faint hover:text-ink"
+        >
           ← Back to project
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">Scan results</h1>
-        <p className="text-gray-600">{scan.finalUrl ?? scan.requestedUrl}</p>
+        <h1 className="mt-2 text-2xl font-semibold text-ink">Scan results</h1>
+        <p className="font-mono text-sm text-ink-faint">{scan.finalUrl ?? scan.requestedUrl}</p>
       </div>
 
-      {!isTerminal && (
-        <ScanProgressPoller workspaceId={params.workspaceId} scanId={scan.id} initialStatus={scan.status} />
-      )}
+      {!isTerminal && <ScanProgressPoller workspaceId={params.workspaceId} scanId={scan.id} initialStatus={scan.status} />}
 
       {scan.status === "FAILED" && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6">
-          <p className="font-medium text-red-900">Scan failed</p>
-          <p className="mt-1 text-sm text-red-700">{scan.failureReason ?? "An unknown error occurred."}</p>
+        <div className="viewfinder rounded-lg border border-critical/30 bg-critical-soft p-6 text-critical">
+          <span className="vf-br" />
+          <span className="vf-bl" />
+          <p className="font-medium text-critical-ink">Scan failed</p>
+          <p className="mt-1 text-sm text-critical-ink/80">{scan.failureReason ?? "An unknown error occurred."}</p>
         </div>
       )}
 
@@ -48,34 +49,35 @@ export default async function ScanPage({
           <ScorePanel score={scan.score} summary={summary} />
 
           {scan.status === "PARTIALLY_COMPLETED" && (
-            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+            <div className="rounded-lg border border-medium/30 bg-medium-soft p-4 text-sm text-medium-ink">
               One or more viewports failed to complete — results below reflect only the viewports that succeeded.
             </div>
           )}
 
           {scan.aiTelemetry && (
-            <div className="rounded-lg border border-violet-200 bg-violet-50 p-4 text-sm text-violet-800">
+            <div className="rounded-lg border border-signal/30 bg-signal-soft p-4 font-mono text-sm text-signal-ink">
               AI validation ({String(scan.aiTelemetry.provider)}): {String(scan.aiTelemetry.totalCalls)} calls, $
               {Number(scan.aiTelemetry.totalEstimatedCostUsd).toFixed(4)} total
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {pages.map((page) => (
-              <div key={page.id}>
-                <p className="mb-1 text-xs font-medium uppercase text-gray-500">{page.viewportName}</p>
-                <ScreenshotViewer url={page.screenshotUrls[0]} label={page.viewportName} />
-              </div>
-            ))}
+          <div>
+            <h2 className="label-eyebrow mb-3">Screenshots</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {pages.map((page) => (
+                <div key={page.id}>
+                  <p className="mb-1.5 font-mono text-xs uppercase tracking-wide text-ink-faint">{page.viewportName}</p>
+                  <ScreenshotViewer url={page.screenshotUrls[0]} label={page.viewportName} />
+                </div>
+              ))}
+            </div>
           </div>
 
           <div>
-            <h2 className="mb-3 text-lg font-semibold text-gray-900">
-              Issues <span className="font-normal text-gray-400">({issues.length})</span>
-            </h2>
+            <h2 className="label-eyebrow mb-3">Issues ({issues.length})</h2>
             <IssueFilterBar />
             {issues.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
+              <p className="rounded-lg border border-dashed border-line-strong p-6 text-center text-ink-faint">
                 No issues match the current filters.
               </p>
             ) : (

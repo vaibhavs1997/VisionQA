@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { ScanForm } from "@/components/scan-form";
+import { Badge } from "@/components/ui/badge";
 
-const STATUS_STYLES: Record<string, string> = {
-  COMPLETED: "bg-green-100 text-green-700",
-  PARTIALLY_COMPLETED: "bg-yellow-100 text-yellow-700",
-  FAILED: "bg-red-100 text-red-700",
+const STATUS_TONE: Record<string, "signal" | "warning" | "neutral"> = {
+  COMPLETED: "signal",
+  PARTIALLY_COMPLETED: "warning",
+  FAILED: "neutral",
 };
 
 export default async function ProjectPage({ params }: { params: { workspaceId: string; projectId: string } }) {
@@ -15,19 +16,19 @@ export default async function ProjectPage({ params }: { params: { workspaceId: s
   return (
     <div className="space-y-8">
       <div>
-        <Link href={`/w/${params.workspaceId}`} className="text-sm text-gray-500 hover:text-gray-700">
+        <Link href={`/w/${params.workspaceId}`} className="font-mono text-xs uppercase tracking-wide text-ink-faint hover:text-ink">
           ← All projects
         </Link>
-        <h1 className="mt-1 text-2xl font-bold text-gray-900">{project.name}</h1>
-        <p className="text-gray-600">{project.baseUrl}</p>
+        <h1 className="mt-2 text-2xl font-semibold text-ink">{project.name}</h1>
+        <p className="font-mono text-sm text-ink-faint">{project.baseUrl}</p>
       </div>
 
       <ScanForm workspaceId={params.workspaceId} projectId={project.id} />
 
       <div>
-        <h2 className="mb-3 text-lg font-semibold text-gray-900">Scan history</h2>
+        <h2 className="label-eyebrow mb-3">Scan history ({scans.length})</h2>
         {scans.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-gray-500">
+          <p className="rounded-lg border border-dashed border-line-strong p-6 text-center text-ink-faint">
             No scans yet — start one above.
           </p>
         ) : (
@@ -36,22 +37,16 @@ export default async function ProjectPage({ params }: { params: { workspaceId: s
               <Link
                 key={scan.id}
                 href={`/w/${params.workspaceId}/scans/${scan.id}`}
-                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white p-4 transition hover:border-gray-300 hover:shadow-sm"
+                className="flex items-center justify-between rounded-lg border border-line bg-surface p-4 transition hover:border-signal hover:shadow-panel"
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`rounded px-2 py-0.5 text-xs font-medium ${
-                        STATUS_STYLES[scan.status] ?? "bg-gray-100 text-gray-600"
-                      }`}
-                    >
-                      {scan.status.replace(/_/g, " ")}
-                    </span>
-                    <span className="text-xs text-gray-400">{scan.viewports.join(", ")}</span>
+                    <Badge tone={STATUS_TONE[scan.status] ?? "neutral"}>{scan.status.replace(/_/g, " ")}</Badge>
+                    <span className="font-mono text-xs text-ink-faint">{scan.viewports.join(", ")}</span>
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">{new Date(scan.createdAt).toLocaleString()}</p>
+                  <p className="mt-1 text-sm text-ink-faint">{new Date(scan.createdAt).toLocaleString()}</p>
                 </div>
-                {scan.score !== null && <p className="text-xl font-bold text-gray-900">{scan.score}/100</p>}
+                {scan.score !== null && <p className="font-mono text-xl font-bold text-ink">{scan.score}/100</p>}
               </Link>
             ))}
           </div>

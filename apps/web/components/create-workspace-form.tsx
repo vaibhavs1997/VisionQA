@@ -26,26 +26,28 @@ export function CreateWorkspaceForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-gray-200 bg-white p-6">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">New workspace</h2>
+    <form onSubmit={handleSubmit} className="viewfinder rounded-lg border border-line bg-surface p-6 text-line-strong">
+      <span className="vf-br" />
+      <span className="vf-bl" />
+      <h2 className="mb-4 text-sm font-semibold text-ink">New workspace</h2>
       <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Workspace name</label>
+        <label className="mb-1 block text-sm font-medium text-ink">Workspace name</label>
         <input
           type="text"
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Acme Inc."
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
+          className="w-full rounded border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-signal focus:outline-none"
         />
       </div>
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-critical">{error}</p>}
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink-soft disabled:opacity-50"
       >
-        {submitting ? "Creating..." : "Create workspace"}
+        {submitting ? "Creating…" : "Create workspace"}
       </button>
     </form>
   );

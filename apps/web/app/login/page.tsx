@@ -1,9 +1,10 @@
 import { LoginForm } from "@/components/login-form";
+import { AuthShell } from "@/components/ui/auth-shell";
 
 export default function LoginPage() {
   return (
-    <div className="flex justify-center py-12">
+    <AuthShell>
       <LoginForm />
-    </div>
+    </AuthShell>
   );
 }

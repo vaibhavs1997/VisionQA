@@ -1,26 +1,43 @@
 import { IssueSummary } from "@/lib/types";
 
-function scoreColor(score: number): string {
-  if (score >= 85) return "text-green-700";
-  if (score >= 60) return "text-yellow-700";
-  return "text-red-700";
+function scoreTone(score: number): { text: string; ring: string } {
+  if (score >= 85) return { text: "text-signal-ink", ring: "text-signal" };
+  if (score >= 60) return { text: "text-medium-ink", ring: "text-medium" };
+  return { text: "text-critical-ink", ring: "text-critical" };
 }
 
+const STAT_ITEMS: { key: keyof IssueSummary; label: string; barClass: string }[] = [
+  { key: "critical", label: "Critical", barClass: "bg-critical" },
+  { key: "high", label: "High", barClass: "bg-high" },
+  { key: "medium", label: "Medium", barClass: "bg-medium" },
+  { key: "low", label: "Low", barClass: "bg-low" },
+];
+
 export function ScorePanel({ score, summary }: { score: number | null; summary: IssueSummary }) {
+  const tone = score !== null ? scoreTone(score) : { text: "text-ink-faint", ring: "text-line-strong" };
+
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6">
-      <div className="flex items-center justify-between">
+    <div className={`viewfinder rounded-lg border border-line bg-surface p-6 shadow-panel ${tone.ring}`}>
+      <span className="vf-br" />
+      <span className="vf-bl" />
+      <div className="flex flex-col gap-6 text-ink sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm text-gray-500">UI Quality Score</p>
-          <p className={`text-4xl font-bold ${score !== null ? scoreColor(score) : "text-gray-400"}`}>
-            {score !== null ? `${score}/100` : "—"}
+          <p className="label-eyebrow mb-1">UI quality score</p>
+          <p className={`font-mono text-5xl font-bold tabular-nums ${tone.text}`}>
+            {score !== null ? score : "—"}
+            <span className="text-xl font-normal text-ink-faint">/100</span>
           </p>
         </div>
-        <div className="flex gap-3 text-sm">
-          <span className="rounded bg-red-100 px-3 py-1.5 font-medium text-critical">Critical: {summary.critical}</span>
-          <span className="rounded bg-orange-100 px-3 py-1.5 font-medium text-high">High: {summary.high}</span>
-          <span className="rounded bg-yellow-100 px-3 py-1.5 font-medium text-medium">Medium: {summary.medium}</span>
-          <span className="rounded bg-gray-100 px-3 py-1.5 font-medium text-low">Low: {summary.low}</span>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {STAT_ITEMS.map((item) => (
+            <div key={item.key} className="rounded border border-line bg-paper px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${item.barClass}`} />
+                <span className="label-eyebrow">{item.label}</span>
+              </div>
+              <p className="font-mono text-lg font-semibold text-ink">{summary[item.key]}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

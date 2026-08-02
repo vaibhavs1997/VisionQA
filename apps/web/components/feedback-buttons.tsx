@@ -5,9 +5,9 @@ import { api } from "@/lib/api-client";
 import { UiIssue } from "@/lib/types";
 
 const OPTIONS: { value: "valid" | "false_positive" | "ignored"; label: string; style: string }[] = [
-  { value: "valid", label: "Valid issue", style: "border-green-300 text-green-700 hover:bg-green-50" },
-  { value: "false_positive", label: "False positive", style: "border-red-300 text-red-700 hover:bg-red-50" },
-  { value: "ignored", label: "Ignore", style: "border-gray-300 text-gray-600 hover:bg-gray-50" },
+  { value: "valid", label: "Valid issue", style: "border-signal/50 text-signal-ink hover:bg-signal-soft" },
+  { value: "false_positive", label: "False positive", style: "border-critical/40 text-critical-ink hover:bg-critical-soft" },
+  { value: "ignored", label: "Ignore", style: "border-line-strong text-ink-faint hover:bg-paper" },
 ];
 
 export function FeedbackButtons({ issue, workspaceId }: { issue: UiIssue; workspaceId: string }) {
@@ -26,26 +26,24 @@ export function FeedbackButtons({ issue, workspaceId }: { issue: UiIssue; worksp
 
   return (
     <div>
-      <p className="mb-2 text-sm font-medium text-gray-700">
+      <p className="mb-2 text-sm font-medium text-ink">
         Is this a real issue?
         {status !== "open" && (
-          <span className="ml-2 text-xs font-normal text-gray-500">
-            (marked as {status.replace(/_/g, " ")})
-          </span>
+          <span className="ml-2 font-mono text-xs font-normal text-ink-faint">(marked as {status.replace(/_/g, " ")})</span>
         )}
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {OPTIONS.map((opt) => (
           <button
             key={opt.value}
             type="button"
             onClick={() => handleClick(opt.value)}
             disabled={submitting !== null}
-            className={`rounded-md border bg-white px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 ${
-              opt.style
-            } ${status === opt.value ? "ring-2 ring-offset-1" : ""}`}
+            className={`rounded border bg-surface px-3 py-1.5 text-sm font-medium transition disabled:opacity-50 ${opt.style} ${
+              status === opt.value ? "ring-2 ring-offset-1 ring-offset-surface" : ""
+            }`}
           >
-            {submitting === opt.value ? "Saving..." : opt.label}
+            {submitting === opt.value ? "Saving…" : opt.label}
           </button>
         ))}
       </div>

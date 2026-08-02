@@ -27,37 +27,41 @@ export function CreateProjectForm({ workspaceId }: { workspaceId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-gray-200 bg-white p-6">
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">New project</h2>
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Project name</label>
-        <input
-          type="text"
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="My Website"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-        />
+    <form onSubmit={handleSubmit} className="viewfinder rounded-lg border border-line bg-surface p-6 text-line-strong">
+      <span className="vf-br" />
+      <span className="vf-bl" />
+      <h2 className="mb-4 text-sm font-semibold text-ink">New project</h2>
+      <div className="mb-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-ink">Project name</label>
+          <input
+            type="text"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="My Website"
+            className="w-full rounded border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-signal focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-ink">Website URL</label>
+          <input
+            type="url"
+            required
+            value={targetUrl}
+            onChange={(e) => setTargetUrl(e.target.value)}
+            placeholder="https://example.com"
+            className="w-full rounded border border-line bg-paper px-3 py-2 font-mono text-sm text-ink focus:border-signal focus:outline-none"
+          />
+        </div>
       </div>
-      <div className="mb-4">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Website URL</label>
-        <input
-          type="url"
-          required
-          value={targetUrl}
-          onChange={(e) => setTargetUrl(e.target.value)}
-          placeholder="https://example.com"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none"
-        />
-      </div>
-      {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-4 text-sm text-critical">{error}</p>}
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+        className="rounded bg-ink px-4 py-2 text-sm font-medium text-paper transition hover:bg-ink-soft disabled:opacity-50"
       >
-        {submitting ? "Creating..." : "Create project"}
+        {submitting ? "Creating…" : "Create project"}
       </button>
     </form>
   );

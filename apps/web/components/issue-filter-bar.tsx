@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 const SEVERITIES = ["critical", "high", "medium", "low"];
 const CATEGORIES = ["image", "network", "layout", "content", "accessibility", "technical"];
 
+const SELECT_CLASS =
+  "rounded border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-signal focus:outline-none";
+
 export function IssueFilterBar() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -17,12 +20,9 @@ export function IssueFilterBar() {
   }
 
   return (
-    <div className="mb-4 flex flex-wrap gap-3">
-      <select
-        value={searchParams.get("severity") ?? ""}
-        onChange={(e) => updateFilter("severity", e.target.value)}
-        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-      >
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      <span className="label-eyebrow">Filter</span>
+      <select value={searchParams.get("severity") ?? ""} onChange={(e) => updateFilter("severity", e.target.value)} className={SELECT_CLASS}>
         <option value="">All severities</option>
         {SEVERITIES.map((s) => (
           <option key={s} value={s}>
@@ -30,11 +30,7 @@ export function IssueFilterBar() {
           </option>
         ))}
       </select>
-      <select
-        value={searchParams.get("category") ?? ""}
-        onChange={(e) => updateFilter("category", e.target.value)}
-        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-      >
+      <select value={searchParams.get("category") ?? ""} onChange={(e) => updateFilter("category", e.target.value)} className={SELECT_CLASS}>
         <option value="">All categories</option>
         {CATEGORIES.map((c) => (
           <option key={c} value={c}>
@@ -42,11 +38,7 @@ export function IssueFilterBar() {
           </option>
         ))}
       </select>
-      <select
-        value={searchParams.get("viewport") ?? ""}
-        onChange={(e) => updateFilter("viewport", e.target.value)}
-        className="rounded-md border border-gray-300 px-3 py-1.5 text-sm"
-      >
+      <select value={searchParams.get("viewport") ?? ""} onChange={(e) => updateFilter("viewport", e.target.value)} className={SELECT_CLASS}>
         <option value="">All viewports</option>
         <option value="desktop">Desktop</option>
         <option value="tablet">Tablet</option>
