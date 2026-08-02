@@ -1,6 +1,6 @@
 # UI Quality Platform — Phase 0 + Phase 1 + Phase 2
 
-A local CLI scanner that opens a public URL in a real browser, runs 17
+A local CLI scanner that opens a public URL in a real browser, runs 22
 deterministic UI-defect detectors across desktop/tablet/mobile viewports,
 optionally validates the most ambiguous ones with an AI vision layer, and
 writes a JSON report, a self-contained HTML report, and
@@ -28,7 +28,7 @@ onto the deterministic detectors, never the primary detection mechanism.
   log, and console log into the stable `PageContext` contract every
   detector reads.
 
-### Phase 1 (modular detection engine — 17 detectors)
+### Phase 1 (modular detection engine — 17 detectors, +5 more in Phase 5 below — 22 total)
 Every detector is a pure function over `PageContext` (`packages/detectors`),
 registered in a plugin registry (`packages/detectors/src/registry.ts`);
 none of them touch the browser directly, which is what makes them
@@ -199,7 +199,7 @@ export ANTHROPIC_API_KEY=sk-...
 npm run scan -- https://example.com --ai anthropic
 ```
 
-AI only ever runs on 3 of the 17 detectors (`element-overlap`, ambiguous
+AI only ever runs on 3 of the 22 detectors (`element-overlap`, ambiguous
 `broken-svg-icon`, `unexpected-disabled-cta`) — see the Phase 2 section
 above. With `--ai` set, `report.json`/`report.html` gain an
 `aiTelemetry` block (call count, cost, latency) and AI-touched issues
@@ -268,7 +268,7 @@ UI_SCAN_CHROMIUM_PATH=/path/to/chromium npx tsx benchmarks/src/run-ai-demo.ts
 apps/cli/                   CLI entrypoint (commander) + scan command
 packages/shared/             PageContext, Universal Issue Object, viewport presets
 packages/scanner-core/       URL Security Guard, Browser Adapter, PageContext Collector
-packages/detectors/          17 detectors (image/network/layout/accessibility/technical/content) + plugin registry
+packages/detectors/          22 detectors (image/network/layout/accessibility/technical/content) + plugin registry
 packages/issue-engine/       Validator, Deduplicator, Scoring, Responsive Delta, Assembler, JSON + HTML report writers
 packages/ai-engine/          Provider-agnostic AI layer: providers, prompts, schemas, crop/annotation/context builders, redaction, cost tracker
 packages/ocr/                Real tesseract.js-based OCR adapter (not wired into any detector by default)
@@ -540,7 +540,7 @@ a signed evidence URL genuinely serves back a real screenshot (verified
 a 93KB PNG at the exact requested viewport resolution) — not just that
 the API returns a URL-shaped string.
 
-184 tests pass across the whole monorepo, run against this same real
+207 tests pass across the whole monorepo, run against this same real
 infrastructure (not mocks) wherever the component being tested touches
 a database, queue, browser, or OCR engine.
 
@@ -595,3 +595,35 @@ compose file itself, this exact `up --build` command has not been run
 in this project's own development environment (no Docker daemon
 available there) — everything it orchestrates was verified working by
 running each piece directly instead (see "Verified live" above).
+
+## Phase 5 (this pass — CI, frontend redesign, detector expansion)
+
+Three additions on top of Phase 0-4, aimed at closing production-readiness
+and product-depth gaps rather than adding a new architectural phase:
+
+**CI/CD.** `.github/workflows/ci.yml` — GitHub Actions runs the full
+build + test suite against real Postgres/Redis service containers (and
+real Chromium) on every push/PR to `main`. `.env.example` files added
+for `apps/api`, `apps/scanner-worker`, `apps/web`, listing every env var
+each service actually reads.
+
+**Frontend redesign (`apps/web`).** New design system: a cool
+graphite/paper palette instead of a generic default, a "viewfinder"
+corner-bracket motif (`.viewfinder` CSS + `<ViewfinderFrame>`) reused
+throughout the UI that echoes the scanner's own bounding-box annotations
+on flagged elements, a sidebar app shell, an instrument-style score
+panel, and a real multi-step scan-progress timeline instead of a single
+spinner. All pages and forms restyled to match.
+
+**Detector expansion (17 → 22).** Five new detectors, all built from
+data `PageContext` already collects (no browser-collection changes):
+`duplicate-element-id-v1`, `heading-hierarchy-skip-v1`,
+`tap-target-too-small-v1`, `ambiguous-link-text-v1`, and
+`fully-obscured-interactive-element-v1` (a higher-confidence, narrower
+sibling of `element-overlap-v1` for near-total coverage cases). 23 new
+unit tests — see `packages/detectors/src/__tests__/`.
+
+**Still open** (see "Known limitations" above, which still applies):
+billing/Stripe, transactional email, error tracking, DB backups, a
+shared Redis-backed rate limiter, and extending AI validation beyond
+its current 3 detector types.
