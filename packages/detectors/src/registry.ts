@@ -22,6 +22,15 @@ import { consoleUiErrorDetector } from "./technical/console-ui-error.detector";
 import { lowContrastCandidateDetector } from "./accessibility/low-contrast-candidate.detector";
 import { unexpectedDisabledCtaDetector } from "./content/unexpected-disabled-cta.detector";
 
+// Phase 5 additions — deeper accessibility coverage + a higher-confidence
+// counterpart to element-overlap, all built on data PageContext already
+// collects (no new browser-side collection required).
+import { duplicateElementIdDetector } from "./technical/duplicate-element-id.detector";
+import { headingHierarchySkipDetector } from "./accessibility/heading-hierarchy-skip.detector";
+import { tapTargetTooSmallDetector } from "./accessibility/tap-target-too-small.detector";
+import { ambiguousLinkTextDetector } from "./accessibility/ambiguous-link-text.detector";
+import { fullyObscuredInteractiveElementDetector } from "./layout/fully-obscured-interactive-element.detector";
+
 /**
  * The full Phase 1 detector set — 17 detectors behind the plugin
  * registry (Phase 1 acceptance criteria: at least 15). Adding a Phase 2+
@@ -54,6 +63,11 @@ export const PHASE_1_DETECTORS: Detector[] = [
   consoleUiErrorDetector,
   lowContrastCandidateDetector,
   unexpectedDisabledCtaDetector,
+  duplicateElementIdDetector,
+  headingHierarchySkipDetector,
+  tapTargetTooSmallDetector,
+  ambiguousLinkTextDetector,
+  fullyObscuredInteractiveElementDetector,
 ];
 
 /** @deprecated kept as an alias so any Phase 0 reference doesn't break; use PHASE_1_DETECTORS. */
