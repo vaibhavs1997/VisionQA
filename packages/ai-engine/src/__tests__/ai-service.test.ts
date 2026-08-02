@@ -268,4 +268,82 @@ describe("enhanceWithAi", () => {
     expect(result).toEqual([candidate]);
     expect(tracker.summarize().totalCalls).toBe(0);
   });
+
+  it("treats low-contrast-borderline as AI-eligible", async () => {
+    const screenshotPath = await makeScreenshot();
+    const elA = makeElement({ selector: "p.subtitle" });
+    const context = makePageContext([elA], screenshotPath);
+
+    const candidate = makeCandidate({
+      issueType: "low-contrast-borderline",
+      category: "accessibility",
+      confidence: 0.6,
+      element: { selector: "p.subtitle", boundingBox: elA.boundingBox! },
+      evidence: { measuredValue: "contrastRatio=4.3", expectedValue: ">=4.5" },
+    });
+
+    const tracker = new AiCostTracker();
+    await enhanceWithAi([candidate], context, {
+      provider: new MockAiProvider({ simulatedLatencyMs: 1 }),
+      costTracker: tracker,
+      viewportScreenshotPath: screenshotPath,
+      cropOutDir: tmpDir,
+    });
+
+    expect(tracker.summarize().totalCalls).toBe(1);
+  });
+
+  it("treats the low-confidence (class-pattern) empty-component bucket as AI-eligible, but not the high-confidence (tag) bucket", async () => {
+    const screenshotPath = await makeScreenshot();
+    const elA = makeElement({ selector: "div.card", tagName: "div" });
+    const elB = makeElement({ id: "el_b", selector: "h2.title", tagName: "h2" });
+    const context = makePageContext([elA, elB], screenshotPath);
+
+    const lowConfidenceCandidate = makeCandidate({
+      issueType: "empty-component",
+      category: "content",
+      confidence: 0.55,
+      element: { selector: "div.card", boundingBox: elA.boundingBox! },
+    });
+    const highConfidenceCandidate = makeCandidate({
+      issueType: "empty-component",
+      category: "content",
+      confidence: 0.75,
+      element: { selector: "h2.title", boundingBox: elB.boundingBox! },
+    });
+
+    const tracker = new AiCostTracker();
+    const result = await enhanceWithAi([lowConfidenceCandidate, highConfidenceCandidate], context, {
+      provider: new MockAiProvider({ simulatedLatencyMs: 1 }),
+      costTracker: tracker,
+      viewportScreenshotPath: screenshotPath,
+      cropOutDir: tmpDir,
+    });
+
+    expect(tracker.summarize().totalCalls).toBe(1);
+    expect(result.find((r) => r.element?.selector === "h2.title")).toEqual(highConfidenceCandidate);
+  });
+
+  it("treats placeholder-generic-token as AI-eligible", async () => {
+    const screenshotPath = await makeScreenshot();
+    const elA = makeElement({ selector: "p.copy", tagName: "p" });
+    const context = makePageContext([elA], screenshotPath);
+
+    const candidate = makeCandidate({
+      issueType: "placeholder-generic-token",
+      category: "content",
+      confidence: 0.6,
+      element: { selector: "p.copy", boundingBox: elA.boundingBox! },
+    });
+
+    const tracker = new AiCostTracker();
+    await enhanceWithAi([candidate], context, {
+      provider: new MockAiProvider({ simulatedLatencyMs: 1 }),
+      costTracker: tracker,
+      viewportScreenshotPath: screenshotPath,
+      cropOutDir: tmpDir,
+    });
+
+    expect(tracker.summarize().totalCalls).toBe(1);
+  });
 });

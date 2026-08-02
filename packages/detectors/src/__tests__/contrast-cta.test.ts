@@ -48,15 +48,20 @@ describe("lowContrastCandidateDetector", () => {
     expect(lowContrastCandidateDetector.run(ctx)).toHaveLength(0);
   });
 
-  it("does NOT flag borderline cases close to the threshold (reserved for AI validation)", () => {
-    // ~4.3:1 is just under the 4.5 requirement but within the 0.3 grace band.
+  it("emits a low-confidence low-contrast-borderline candidate (not the clear-fail issueType) for cases close to the threshold", () => {
+    // rgb(122,122,122) on white computes to ~4.29:1 — just under the 4.5
+    // requirement but within the 0.3 grace band (4.2-4.5).
     const el = makeElement({
       visibleText: "Borderline text",
-      computedStyle: { color: "rgb(117, 117, 117)", fontSize: "16px", fontWeight: "400" } as any,
+      computedStyle: { color: "rgb(122, 122, 122)", fontSize: "16px", fontWeight: "400" } as any,
       effectiveBackgroundColor: "rgb(255, 255, 255)",
     });
     const ctx = makePageContext({ elements: [el] });
-    expect(lowContrastCandidateDetector.run(ctx)).toHaveLength(0);
+    const issues = lowContrastCandidateDetector.run(ctx) as any[];
+    expect(issues).toHaveLength(1);
+    expect(issues[0].issueType).toBe("low-contrast-borderline");
+    expect(issues[0].confidence).toBe(0.6);
+    expect(issues[0].severity).toBe("low");
   });
 });
 

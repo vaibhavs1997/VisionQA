@@ -21,20 +21,39 @@ export interface AiEnhanceOptions {
 
 /**
  * Per Phase 2 scope: "AI runs only for ambiguous or high-value candidate
- * issues, not every page element." These three issue types were chosen
- * because each is exactly the kind of detector the deterministic layer
- * can only partially resolve on its own:
+ * issues, not every page element." Each type below is one the
+ * deterministic layer can only partially resolve on its own — the
+ * detector itself either says so directly in its own comments, or (for
+ * low-contrast-borderline) exists specifically because the deterministic
+ * check can't tell a near-miss from a real failure:
  *  - element-overlap: explicitly called out in the spec's own Detectors
  *    table ("AI judges whether measured overlap is visually harmful").
  *  - broken-svg-icon: the icon-font-class case is a deliberately lower-
  *    confidence guess (see the detector's own comments).
  *  - unexpected-disabled-cta: "unexpected" is inherently a judgment call
  *    the detector itself flags as its riskiest false-positive surface.
+ *  - low-contrast-borderline: contrast ratios within 0.3 of the WCAG
+ *    threshold — genuinely too close to call without looking at the
+ *    actual rendered crop (anti-aliasing, sub-pixel color blending, and
+ *    background-color-resolution noise all live in this band).
+ *  - empty-component, class-pattern bucket only (confidence < 0.75, i.e.
+ *    NOT the higher-confidence heading/button-tag bucket): a "card"/
+ *    "widget"-classed empty container might be a genuine loading bug, or
+ *    might be a legitimate empty-state/ad-slot/skeleton placeholder —
+ *    only a look at the actual render can tell those apart.
+ *  - placeholder-generic-token: generic tokens like "TODO" or "sample
+ *    text" are real placeholder markers in some copy and completely
+ *    legitimate words in others (a support page literally explaining
+ *    "how to file a TODO ticket") — AI reviews the surrounding text and
+ *    render together rather than trusting the keyword match alone.
  */
 function isAiEligible(candidate: IssueCandidate): boolean {
   if (candidate.issueType === "element-overlap") return true;
   if (candidate.issueType === "broken-svg-icon" && candidate.confidence < 0.75) return true;
   if (candidate.issueType === "unexpected-disabled-cta") return true;
+  if (candidate.issueType === "low-contrast-borderline") return true;
+  if (candidate.issueType === "empty-component" && candidate.confidence < 0.75) return true;
+  if (candidate.issueType === "placeholder-generic-token") return true;
   return false;
 }
 

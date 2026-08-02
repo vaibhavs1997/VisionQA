@@ -199,8 +199,10 @@ export ANTHROPIC_API_KEY=sk-...
 npm run scan -- https://example.com --ai anthropic
 ```
 
-AI only ever runs on 3 of the 22 detectors (`element-overlap`, ambiguous
-`broken-svg-icon`, `unexpected-disabled-cta`) — see the Phase 2 section
+AI only ever runs on 6 of the 22 detectors' issue types
+(`element-overlap`, ambiguous `broken-svg-icon`, `unexpected-disabled-cta`,
+`low-contrast-borderline`, the class-pattern bucket of `empty-component`,
+and `placeholder-generic-token`) — see the Phase 2 and Phase 5 sections
 above. With `--ai` set, `report.json`/`report.html` gain an
 `aiTelemetry` block (call count, cost, latency) and AI-touched issues
 show an "AI: confirm / suppress / needs more evidence" badge plus a
@@ -623,7 +625,21 @@ data `PageContext` already collects (no browser-collection changes):
 sibling of `element-overlap-v1` for near-total coverage cases). 23 new
 unit tests — see `packages/detectors/src/__tests__/`.
 
+**AI validation coverage (3 → 6 eligible issue types).** Extended
+`isAiEligible` in `packages/ai-engine/src/ai-service.ts` to also cover
+`low-contrast-borderline`, the class-pattern (lower-confidence) bucket
+of `empty-component`, and `placeholder-generic-token`. The
+`low-contrast-candidate` detector previously *silently dropped*
+borderline contrast cases — its own comment promised they were
+"reserved for AI validation" but nothing actually sent them there; that
+detector now emits them as a distinct `low-contrast-borderline`
+issueType at exactly the accessibility confidence floor (0.6), since
+the Issue Engine's confidence-threshold filter runs *before* AI
+enhancement in the pipeline — a candidate meant for AI review has to
+clear that gate on its own first. The system prompt's framing was also
+generalized from "geometrically ambiguous" to cover contrast/content
+ambiguity too. 5 new tests across the detector and `ai-service` suites.
+
 **Still open** (see "Known limitations" above, which still applies):
-billing/Stripe, transactional email, error tracking, DB backups, a
-shared Redis-backed rate limiter, and extending AI validation beyond
-its current 3 detector types.
+billing/Stripe, transactional email, error tracking, DB backups, and a
+shared Redis-backed rate limiter.

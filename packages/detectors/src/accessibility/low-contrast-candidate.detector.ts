@@ -63,11 +63,45 @@ export const lowContrastCandidateDetector: Detector = {
 
       if (ratio >= requiredRatio) continue;
 
-      // Only flag clearly-failing cases in Phase 1 (ratio meaningfully
-      // below the requirement) — borderline cases (within 0.3 of the
-      // threshold) are exactly the kind of ambiguous judgment call
-      // reserved for AI validation in Phase 2, not a deterministic call.
-      if (ratio > requiredRatio - 0.3) continue;
+      // Borderline cases (within 0.3 of the threshold) are exactly the
+      // ambiguous judgment call this detector can't resolve on its own —
+      // measurement noise in the effective-background-color walk, subtle
+      // anti-aliasing, or a color that's "technically failing but reads
+      // fine in practice" can all live in this narrow band. Rather than
+      // silently dropping them, emit a separate, lower-certainty
+      // issueType and let AI review the actual rendered crop.
+      //
+      // This is emitted at exactly MIN_CONFIDENCE_BY_CATEGORY.accessibility
+      // (0.6) rather than something lower — the Issue Engine's confidence
+      // threshold runs *before* AI enhancement in the pipeline, so a
+      // candidate that's meant to reach AI review has to clear that gate
+      // on its own first; AI can still suppress it afterwards.
+      if (ratio > requiredRatio - 0.3) {
+        candidates.push({
+          category: "accessibility",
+          issueType: "low-contrast-borderline",
+          title: "Text contrast is borderline against WCAG AA",
+          description: `Computed contrast ratio ${ratio.toFixed(
+            2
+          )}:1 is just under the ${requiredRatio}:1 minimum for ${isLargeText ? "large" : "normal"} text — close enough to the line that a deterministic check alone can't be confident this is a real problem.`,
+          severity: "low",
+          confidence: 0.6,
+          element: {
+            selector: el.selector,
+            tagName: el.tagName,
+            text: el.visibleText.slice(0, 80),
+            boundingBox: el.boundingBox ?? undefined,
+          },
+          evidence: {
+            measuredValue: `contrastRatio=${ratio.toFixed(2)}`,
+            expectedValue: `>=${requiredRatio}`,
+          },
+          suggestedFix: "Darken the text color or lighten the background slightly to clear WCAG AA contrast with margin.",
+          detector: { id: "low-contrast-candidate-v1", version: "1.0.0", source: "deterministic" },
+          rootCauseSignature: `low-contrast-borderline:${el.selector}`,
+        });
+        continue;
+      }
 
       const confidence = ratio < requiredRatio - 1.5 ? 0.75 : 0.6;
 
