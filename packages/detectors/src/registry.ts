@@ -31,6 +31,16 @@ import { tapTargetTooSmallDetector } from "./accessibility/tap-target-too-small.
 import { ambiguousLinkTextDetector } from "./accessibility/ambiguous-link-text.detector";
 import { fullyObscuredInteractiveElementDetector } from "./layout/fully-obscured-interactive-element.detector";
 
+// Tier 1 additions — SEO/crawler visibility pack + two more
+// zero-collector-change detectors, closing out the checklist categories
+// that were previously at zero coverage.
+import { metaTagsDetector } from "./seo/meta-tags.detector";
+import { openGraphTagsDetector } from "./seo/open-graph-tags.detector";
+import { robotsAndSitemapDetector } from "./seo/robots-and-sitemap.detector";
+import { blockedCriticalResourceDetector } from "./seo/blocked-critical-resource.detector";
+import { fontSizeTooSmallDetector } from "./accessibility/font-size-too-small.detector";
+import { imageAspectRatioDistortedDetector } from "./image/image-aspect-ratio-distorted.detector";
+
 /**
  * The full Phase 1 detector set — 17 detectors behind the plugin
  * registry (Phase 1 acceptance criteria: at least 15). Adding a Phase 2+
@@ -68,6 +78,12 @@ export const PHASE_1_DETECTORS: Detector[] = [
   tapTargetTooSmallDetector,
   ambiguousLinkTextDetector,
   fullyObscuredInteractiveElementDetector,
+  metaTagsDetector,
+  openGraphTagsDetector,
+  robotsAndSitemapDetector,
+  blockedCriticalResourceDetector,
+  fontSizeTooSmallDetector,
+  imageAspectRatioDistortedDetector,
 ];
 
 /** @deprecated kept as an alias so any Phase 0 reference doesn't break; use PHASE_1_DETECTORS. */

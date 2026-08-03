@@ -336,11 +336,33 @@ export async function collectPageDataInBrowser() {
   }
 
   const doc = document.documentElement;
+
+  // On-page SEO signals — cheap DOM reads, no network involved (robots.txt
+  // and sitemap reachability are checked separately at the collector
+  // level, since those need an HTTP fetch of a different URL entirely).
+  function metaContent(selector: string): string | undefined {
+    return document.querySelector(selector)?.getAttribute("content") || undefined;
+  }
+  const ogTags = {
+    title: metaContent('meta[property="og:title"]'),
+    description: metaContent('meta[property="og:description"]'),
+    image: metaContent('meta[property="og:image"]'),
+    url: metaContent('meta[property="og:url"]'),
+    type: metaContent('meta[property="og:type"]'),
+  };
+  const seoMeta = {
+    metaDescription: metaContent('meta[name="description"]'),
+    metaRobots: metaContent('meta[name="robots"]'),
+    canonicalUrl: document.querySelector('link[rel="canonical"]')?.getAttribute("href") || undefined,
+    openGraph: ogTags,
+  };
+
   return {
     elements,
     images,
     svgs,
     fonts,
+    seoMeta,
     documentWidth: doc.scrollWidth,
     documentHeight: doc.scrollHeight,
     viewportWidth: window.innerWidth,

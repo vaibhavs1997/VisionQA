@@ -1,6 +1,6 @@
 # UI Quality Platform — Phase 0 + Phase 1 + Phase 2
 
-A local CLI scanner that opens a public URL in a real browser, runs 22
+A local CLI scanner that opens a public URL in a real browser, runs 28
 deterministic UI-defect detectors across desktop/tablet/mobile viewports,
 optionally validates the most ambiguous ones with an AI vision layer, and
 writes a JSON report, a self-contained HTML report, and
@@ -28,7 +28,7 @@ onto the deterministic detectors, never the primary detection mechanism.
   log, and console log into the stable `PageContext` contract every
   detector reads.
 
-### Phase 1 (modular detection engine — 17 detectors, +5 more in Phase 5 below — 22 total)
+### Phase 1 (modular detection engine — 17 detectors, +11 more in Phase 5 below — 28 total)
 Every detector is a pure function over `PageContext` (`packages/detectors`),
 registered in a plugin registry (`packages/detectors/src/registry.ts`);
 none of them touch the browser directly, which is what makes them
@@ -199,7 +199,7 @@ export ANTHROPIC_API_KEY=sk-...
 npm run scan -- https://example.com --ai anthropic
 ```
 
-AI only ever runs on 6 of the 22 detectors' issue types
+AI only ever runs on 6 of the 28 detectors' issue types
 (`element-overlap`, ambiguous `broken-svg-icon`, `unexpected-disabled-cta`,
 `low-contrast-borderline`, the class-pattern bucket of `empty-component`,
 and `placeholder-generic-token`) — see the Phase 2 and Phase 5 sections
@@ -270,7 +270,7 @@ UI_SCAN_CHROMIUM_PATH=/path/to/chromium npx tsx benchmarks/src/run-ai-demo.ts
 apps/cli/                   CLI entrypoint (commander) + scan command
 packages/shared/             PageContext, Universal Issue Object, viewport presets
 packages/scanner-core/       URL Security Guard, Browser Adapter, PageContext Collector
-packages/detectors/          22 detectors (image/network/layout/accessibility/technical/content) + plugin registry
+packages/detectors/          28 detectors (image/network/layout/accessibility/technical/content/seo) + plugin registry
 packages/issue-engine/       Validator, Deduplicator, Scoring, Responsive Delta, Assembler, JSON + HTML report writers
 packages/ai-engine/          Provider-agnostic AI layer: providers, prompts, schemas, crop/annotation/context builders, redaction, cost tracker
 packages/ocr/                Real tesseract.js-based OCR adapter (not wired into any detector by default)
@@ -542,7 +542,7 @@ a signed evidence URL genuinely serves back a real screenshot (verified
 a 93KB PNG at the exact requested viewport resolution) — not just that
 the API returns a URL-shaped string.
 
-207 tests pass across the whole monorepo, run against this same real
+239 tests pass across the whole monorepo, run against this same real
 infrastructure (not mocks) wherever the component being tested touches
 a database, queue, browser, or OCR engine.
 
@@ -639,6 +639,47 @@ enhancement in the pipeline — a candidate meant for AI review has to
 clear that gate on its own first. The system prompt's framing was also
 generalized from "geometrically ambiguous" to cover contrast/content
 ambiguity too. 5 new tests across the detector and `ai-service` suites.
+
+**Tier 1 checklist coverage (22 → 28 detectors, new `seo` category).**
+Closed the SEO/crawler-visibility checklist section from zero to
+covered, plus two more zero-collector-change detectors:
+- `meta-tags-v1`: missing/malformed meta description, `noindex` robots
+  meta (critical severity — usually an accidental staging leftover),
+  missing canonical tag.
+- `open-graph-tags-v1`: missing og:title/description/image (controls
+  how a shared link preview renders in Slack/iMessage/LinkedIn/etc).
+- `robots-and-sitemap-v1` + `blocked-critical-resource-v1`: robots.txt
+  and sitemap reachability, and — the subtler one — cross-referencing
+  robots.txt Disallow rules against the CSS/JS the page actually loads,
+  since a real browser ignores robots.txt but Googlebot's renderer
+  respects it, so a too-broad Disallow rule can make Google's indexed
+  view of a page look broken even though every human visitor sees it
+  fine.
+- `font-size-too-small-v1` (accessibility) and
+  `image-aspect-ratio-distorted-v1` (image): straightforward, built on
+  data already collected — no browser-side changes needed.
+
+robots.txt/sitemap reachability required real infrastructure changes,
+not just a new detector: `BrowserAdapter` gained a `fetchExternal`
+method (Playwright's request context, capped response size, URL
+Security Guard applied to every target before fetching — same SSRF
+defense the page-navigation path already uses), and the in-page
+collection script now reads `<meta>`/`<link rel="canonical">`/Open
+Graph tags. All four SEO detectors are gated to the desktop viewport
+only — these are `<head>`-level properties that don't vary by
+viewport, and the pipeline deduplicates issues within a single
+viewport's candidates, not across a scan's three viewports, so without
+that gate every SEO issue would be reported three times over. 29 new
+tests.
+
+**Deliberately deferred: broken-link checking.** Fetching every unique
+`<a href>` on a page to check for 404s was scoped as a Tier 1 item but
+cut here — unlike a single robots.txt fetch, it's a genuinely different
+cost/risk shape (potentially dozens of external requests per scan,
+adding real latency, and a larger SSRF-adjacent surface even with the
+URL Security Guard applied per-link) that deserves a deliberate call on
+link-count caps and same-origin-vs-external scope rather than a default
+buried in a detector.
 
 **Still open** (see "Known limitations" above, which still applies):
 billing/Stripe, transactional email, error tracking, DB backups, and a

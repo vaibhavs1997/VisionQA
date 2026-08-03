@@ -18,6 +18,7 @@ export interface RawElementData {
   images: unknown[];
   svgs: unknown[];
   fonts: unknown[];
+  seoMeta: unknown;
   documentWidth: number;
   documentHeight: number;
   viewportWidth: number;
@@ -25,6 +26,13 @@ export interface RawElementData {
   scrollWidth: number;
   scrollHeight: number;
   hasHorizontalScroll: boolean;
+}
+
+export interface ExternalFetchResult {
+  ok: boolean;
+  status?: number;
+  body?: string;
+  error?: string;
 }
 
 /**
@@ -40,5 +48,16 @@ export interface BrowserAdapter {
   collectPageData(): Promise<RawElementData>;
   captureScreenshots(viewportName: string, outDir: string): Promise<ScreenshotAsset[]>;
   getUserAgent(): Promise<string>;
+  /**
+   * Fetches a URL outside the page's own navigation — used for
+   * robots.txt/sitemap reachability checks, which are about a different
+   * resource entirely, not the page being scanned. Callers MUST run
+   * `assertUrlIsSafe` on the target first; this method does not repeat
+   * that check itself so it isn't hidden inside an adapter method that's
+   * easy to forget matters. Must never throw — failures come back as
+   * `{ ok: false, error }` so a single unreachable robots.txt can't take
+   * down the scan the way an unhandled rejection would.
+   */
+  fetchExternal(url: string, timeoutMs?: number): Promise<ExternalFetchResult>;
   close(): Promise<void>;
 }

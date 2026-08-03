@@ -9,7 +9,8 @@ export type IssueCategory =
   | "content"
   | "accessibility"
   | "technical"
-  | "visual-ai";
+  | "visual-ai"
+  | "seo";
 
 export type DetectorSource = "deterministic" | "computer-vision" | "ocr" | "ai";
 

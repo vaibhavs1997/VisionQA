@@ -15,6 +15,7 @@ const MIN_CONFIDENCE_BY_CATEGORY: Partial<Record<IssueCategory, number>> = {
   accessibility: 0.6,
   technical: 0.6,
   "visual-ai": 0.75,
+  seo: 0.7,
 };
 
 const DEFAULT_MIN_CONFIDENCE = 0.6;

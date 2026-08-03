@@ -205,6 +205,26 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
     return this.page.evaluate(() => navigator.userAgent);
   }
 
+  async fetchExternal(url: string, timeoutMs = 5000): Promise<import("./browser-adapter").ExternalFetchResult> {
+    if (!this.context) return { ok: false, error: "adapter not open" };
+    try {
+      const response = await this.context.request.get(url, {
+        timeout: timeoutMs,
+        maxRedirects: 5,
+        failOnStatusCode: false,
+      });
+      const status = response.status();
+      // robots.txt/sitemap files are always small; cap defensively so a
+      // misconfigured server returning something enormous at this path
+      // can't blow up memory the way an uncapped page response could.
+      const buffer = await response.body();
+      const body = buffer.slice(0, 200_000).toString("utf-8");
+      return { ok: status >= 200 && status < 400, status, body };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "fetch failed" };
+    }
+  }
+
   async close(): Promise<void> {
     await this.page?.close().catch(() => {});
     await this.context?.close().catch(() => {});

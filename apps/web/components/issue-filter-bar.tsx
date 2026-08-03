@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 
 const SEVERITIES = ["critical", "high", "medium", "low"];
-const CATEGORIES = ["image", "network", "layout", "content", "accessibility", "technical"];
+const CATEGORIES = ["image", "network", "layout", "content", "accessibility", "technical", "seo"];
 
 const SELECT_CLASS =
   "rounded border border-line bg-surface px-3 py-1.5 text-sm text-ink focus:border-signal focus:outline-none";

@@ -143,6 +143,40 @@ export interface SvgSnapshot {
   isLikelyIconFont: boolean;
 }
 
+export interface OpenGraphTags {
+  title?: string;
+  description?: string;
+  image?: string;
+  url?: string;
+  type?: string;
+}
+
+export interface RobotsTxtCheck {
+  checked: boolean;
+  accessible: boolean;
+  statusCode?: number;
+  sitemapUrls: string[];
+  /** Disallow rules parsed for the wildcard (User-agent: *) group only —
+   * good enough to flag obviously-blocked CSS/JS without implementing a
+   * full robots.txt rule-precedence engine. */
+  disallowRules: string[];
+}
+
+export interface SitemapCheck {
+  url: string;
+  accessible: boolean;
+  statusCode?: number;
+}
+
+export interface SeoSnapshot {
+  metaDescription?: string;
+  metaRobots?: string;
+  canonicalUrl?: string;
+  openGraph: OpenGraphTags;
+  robotsTxt: RobotsTxtCheck;
+  sitemap?: SitemapCheck;
+}
+
 export interface PageContext {
   scan: {
     scanId: string;
@@ -164,6 +198,10 @@ export interface PageContext {
     scrollWidth: number;
     scrollHeight: number;
     hasHorizontalScroll: boolean;
+    /** Optional because the internal benchmark harness (localhost
+     * fixtures) and any environment where the robots.txt/sitemap fetch
+     * itself failed outright won't have this populated. */
+    seo?: SeoSnapshot;
   };
   elements: ElementSnapshot[];
   images: ImageSnapshot[];
