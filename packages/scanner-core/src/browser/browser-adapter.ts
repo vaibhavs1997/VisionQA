@@ -40,6 +40,17 @@ export interface FocusCheckResult {
   hasVisibleFocusIndicator: boolean;
 }
 
+export interface HoverCheckResult {
+  selector: string;
+  hasVisibleHoverFeedback: boolean;
+}
+
+export interface ExpandableToggleResult {
+  selector: string;
+  toggledCorrectly: boolean;
+  ariaControlsSelector?: string;
+}
+
 /**
  * The Browser Adapter is the ONLY module allowed to import a browser
  * automation library. Everything above this boundary — detectors, the
@@ -74,5 +85,19 @@ export interface BrowserAdapter {
    * guessed at.
    */
   checkFocusIndicators(selectors: string[]): Promise<FocusCheckResult[]>;
+  /**
+   * Same shape as `checkFocusIndicators` but for `:hover` — hovers each
+   * element for real and diffs style against its own resting baseline.
+   */
+  checkHoverFeedback(selectors: string[]): Promise<HoverCheckResult[]>;
+  /**
+   * Clicks each given `aria-expanded` element for real and checks
+   * whether the attribute actually flips and (when `aria-controls`
+   * points at a real element) whether that element's visibility follows
+   * the new state. Restores the original state with a second click
+   * before returning, so this doesn't leave the page in a different
+   * condition for whatever runs after it in the same collection pass.
+   */
+  checkExpandableToggles(selectors: string[]): Promise<ExpandableToggleResult[]>;
   close(): Promise<void>;
 }

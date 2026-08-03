@@ -1,6 +1,6 @@
 # UI Quality Platform — Phase 0 + Phase 1 + Phase 2
 
-A local CLI scanner that opens a public URL in a real browser, runs 31 deterministic
+A local CLI scanner that opens a public URL in a real browser, runs 33 deterministic
 UI-defect detectors across desktop/tablet/mobile viewports,
 optionally validates the most ambiguous ones with an AI vision layer, and
 writes a JSON report, a self-contained HTML report, and
@@ -199,7 +199,7 @@ export ANTHROPIC_API_KEY=sk-...
 npm run scan -- https://example.com --ai anthropic
 ```
 
-AI only ever runs on 6 of the 31 detectors' issue types
+AI only ever runs on 6 of the 33 detectors' issue types
 (`element-overlap`, ambiguous `broken-svg-icon`, `unexpected-disabled-cta`,
 `low-contrast-borderline`, the class-pattern bucket of `empty-component`,
 and `placeholder-generic-token`) — see the Phase 2 and Phase 5 sections
@@ -270,7 +270,7 @@ UI_SCAN_CHROMIUM_PATH=/path/to/chromium npx tsx benchmarks/src/run-ai-demo.ts
 apps/cli/                   CLI entrypoint (commander) + scan command
 packages/shared/             PageContext, Universal Issue Object, viewport presets
 packages/scanner-core/       URL Security Guard, Browser Adapter, PageContext Collector
-packages/detectors/          31 detectors (image/network/layout/accessibility/technical/content/seo) + plugin registry
+packages/detectors/          33 detectors (image/network/layout/accessibility/technical/content/seo) + plugin registry
 packages/issue-engine/       Validator, Deduplicator, Scoring, Responsive Delta, Assembler, JSON + HTML report writers
 packages/ai-engine/          Provider-agnostic AI layer: providers, prompts, schemas, crop/annotation/context builders, redaction, cost tracker
 packages/ocr/                Real tesseract.js-based OCR adapter (not wired into any detector by default)
@@ -727,10 +727,33 @@ meaningfully higher per-element cost than a network fetch, so there's
 no reason to pay that cost three times over for a result that won't
 vary by viewport. 7 new tests.
 
-**Still open from Tier 2:** hover/active-state screenshot diffing and
-dropdown/menu expand-collapse verification — both would reuse the same
-interaction-simulation foundation just built, but weren't tackled this
-pass.
+**Tier 2 completed: hover feedback + dropdown/menu toggles (31 → 33
+detectors).** The remaining two Tier 2 items, built on the same
+interaction-simulation foundation:
+- `missing-hover-feedback-v1` (content, low severity): hovers a capped
+  sample of links/buttons for real and diffs style (background, text
+  color, border, box-shadow, cursor) against each element's own
+  resting baseline — same technique as the focus check, for `:hover`
+  instead. Lower severity than a missing focus indicator, deliberately
+  — a sighted mouse user can usually still tell a link/button is
+  clickable from its baseline styling even with zero hover change, so
+  this is a polish issue, not an accessibility blocker.
+- `broken-expandable-toggle-v1` (technical, high severity): clicks a
+  capped sample of `aria-expanded` elements — the standard ARIA pattern
+  behind dropdowns, accordions, and disclosure widgets — and verifies
+  the attribute actually flips and, when `aria-controls` points at a
+  real element, that element's visibility follows. Flags either "the
+  toggle doesn't do anything" or the subtler bug: `aria-expanded` says
+  one thing while the panel it describes shows another, which is a
+  real defect for anyone using assistive technology even if it looks
+  fine visually. Restores the original state with a second click
+  before returning, so it doesn't leave the page altered for anything
+  reading it afterward.
+
+Both gated to the desktop viewport at the collection source, same
+reasoning as the focus check. 6 new tests. This closes Tier 2 — every
+item from that tier (focus indicators, tab order, hover feedback,
+dropdown/menu toggles) is now covered.
 
 **Still open** (see "Known limitations" above, which still applies):
 billing/Stripe, transactional email, error tracking, DB backups, and a

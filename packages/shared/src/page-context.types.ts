@@ -189,6 +189,21 @@ export interface FocusIndicatorCheck {
   hasVisibleFocusIndicator: boolean;
 }
 
+export interface HoverFeedbackCheck {
+  selector: string;
+  hasVisibleHoverFeedback: boolean;
+}
+
+export interface ExpandableToggleCheck {
+  selector: string;
+  /** True if clicking toggled aria-expanded AND (when aria-controls is
+   * present) the controlled element's visibility actually changed in
+   * the corresponding direction. False covers both "nothing happened"
+   * and "aria-expanded flipped but the controlled panel didn't." */
+  toggledCorrectly: boolean;
+  ariaControlsSelector?: string;
+}
+
 export interface PageContext {
   scan: {
     scanId: string;
@@ -232,6 +247,22 @@ export interface PageContext {
      * this array wasn't sampled, same convention as `linkChecks`.
      */
     focusIndicatorChecks?: FocusIndicatorCheck[];
+    /**
+     * Visible hover-feedback results for a capped sample of interactive
+     * elements — hovers each one for real and diffs computed style
+     * (background-color, color, border-color, box-shadow, cursor)
+     * against its own un-hovered baseline. Same "absent = not sampled"
+     * convention as the other interaction-based checks.
+     */
+    hoverFeedbackChecks?: HoverFeedbackCheck[];
+    /**
+     * Click-and-verify results for a capped sample of `aria-expanded`
+     * elements (the standard ARIA pattern for disclosure widgets,
+     * dropdowns, and accordions) — clicks each one for real and checks
+     * whether `aria-expanded` actually flips and, when `aria-controls`
+     * is present, whether the controlled element's visibility follows.
+     */
+    expandableToggleChecks?: ExpandableToggleCheck[];
   };
   elements: ElementSnapshot[];
   images: ImageSnapshot[];

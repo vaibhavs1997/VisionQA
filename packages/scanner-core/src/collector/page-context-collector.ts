@@ -10,6 +10,8 @@ import {
   SeoSnapshot,
   LinkCheck,
   FocusIndicatorCheck,
+  HoverFeedbackCheck,
+  ExpandableToggleCheck,
 } from "@ui-quality/shared";
 import { BrowserAdapter } from "../browser/browser-adapter";
 import { assertUrlIsSafe } from "../security/url-security-guard";
@@ -148,6 +150,8 @@ export async function collectPageContext(
   const seo = await collectSeoSnapshot(adapter, navResult.finalUrl, rawSeoMeta, options);
   const linkChecks = await collectLinkChecks(adapter, elements, navResult.finalUrl, options);
   const focusIndicatorChecks = await collectFocusIndicatorChecks(adapter, elements, viewport);
+  const hoverFeedbackChecks = await collectHoverFeedbackChecks(adapter, elements, viewport);
+  const expandableToggleChecks = await collectExpandableToggleChecks(adapter, elements, viewport);
 
   const pageContext: PageContext = {
     scan: {
@@ -173,6 +177,8 @@ export async function collectPageContext(
       seo,
       linkChecks,
       focusIndicatorChecks,
+      hoverFeedbackChecks,
+      expandableToggleChecks,
     },
     elements,
     images,
@@ -339,4 +345,57 @@ async function collectFocusIndicatorChecks(
   if (candidateSelectors.length === 0) return [];
 
   return adapter.checkFocusIndicators(candidateSelectors);
+}
+
+const MAX_HOVER_CHECKS = 20;
+
+/**
+ * Same shape and reasoning as `collectFocusIndicatorChecks`, for hover
+ * instead of focus. Scoped to elements a real user would actually
+ * expect hover feedback from — links and buttons, not every element
+ * `isInteractive` happens to be true for (e.g. a form input doesn't
+ * conventionally get a hover style the way a clickable button does).
+ */
+async function collectHoverFeedbackChecks(
+  adapter: BrowserAdapter,
+  elements: ElementSnapshot[],
+  viewport: Viewport
+): Promise<HoverFeedbackCheck[]> {
+  if (viewport.name !== "desktop") return [];
+
+  const candidateSelectors = elements
+    .filter((el) => el.isVisible && (el.tagName === "a" || el.tagName === "button"))
+    .slice(0, MAX_HOVER_CHECKS)
+    .map((el) => el.selector);
+
+  if (candidateSelectors.length === 0) return [];
+
+  return adapter.checkHoverFeedback(candidateSelectors);
+}
+
+const MAX_TOGGLE_CHECKS = 10;
+
+/**
+ * Samples elements carrying `aria-expanded` — the standard ARIA pattern
+ * for dropdowns, accordions, and disclosure widgets — and clicks each
+ * one to verify the toggle actually works, via `checkExpandableToggles`
+ * on the Browser Adapter (which also restores the original state before
+ * returning). Capped lower than focus/hover checks since a click-wait-
+ * click-wait cycle is slower than a single focus or hover.
+ */
+async function collectExpandableToggleChecks(
+  adapter: BrowserAdapter,
+  elements: ElementSnapshot[],
+  viewport: Viewport
+): Promise<ExpandableToggleCheck[]> {
+  if (viewport.name !== "desktop") return [];
+
+  const candidateSelectors = elements
+    .filter((el) => el.isVisible && el.attributes["aria-expanded"] !== undefined)
+    .slice(0, MAX_TOGGLE_CHECKS)
+    .map((el) => el.selector);
+
+  if (candidateSelectors.length === 0) return [];
+
+  return adapter.checkExpandableToggles(candidateSelectors);
 }

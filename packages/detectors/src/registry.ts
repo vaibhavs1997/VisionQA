@@ -43,6 +43,8 @@ import { imageAspectRatioDistortedDetector } from "./image/image-aspect-ratio-di
 import { brokenLinkDetector } from "./network/broken-link.detector";
 import { missingFocusIndicatorDetector } from "./accessibility/missing-focus-indicator.detector";
 import { positiveTabindexDetector } from "./accessibility/positive-tabindex.detector";
+import { missingHoverFeedbackDetector } from "./content/missing-hover-feedback.detector";
+import { brokenExpandableToggleDetector } from "./technical/broken-expandable-toggle.detector";
 
 /**
  * The full Phase 1 detector set — 17 detectors behind the plugin
@@ -90,6 +92,8 @@ export const PHASE_1_DETECTORS: Detector[] = [
   brokenLinkDetector,
   missingFocusIndicatorDetector,
   positiveTabindexDetector,
+  missingHoverFeedbackDetector,
+  brokenExpandableToggleDetector,
 ];
 
 /** @deprecated kept as an alias so any Phase 0 reference doesn't break; use PHASE_1_DETECTORS. */

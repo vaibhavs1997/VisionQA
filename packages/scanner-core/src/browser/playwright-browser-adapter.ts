@@ -270,6 +270,109 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
     return results;
   }
 
+  async checkHoverFeedback(
+    selectors: string[]
+  ): Promise<import("./browser-adapter").HoverCheckResult[]> {
+    if (!this.page) return [];
+    const results: import("./browser-adapter").HoverCheckResult[] = [];
+
+    for (const selector of selectors) {
+      try {
+        const locator = this.page.locator(selector).first();
+        if ((await locator.count()) === 0) continue;
+
+        const restingStyle = await locator.evaluate((el) => {
+          const s = getComputedStyle(el as Element);
+          return { backgroundColor: s.backgroundColor, color: s.color, borderColor: s.borderColor, boxShadow: s.boxShadow, cursor: s.cursor };
+        });
+
+        await locator.hover({ timeout: 2000 });
+        const hoveredStyle = await locator.evaluate((el) => {
+          const s = getComputedStyle(el as Element);
+          return { backgroundColor: s.backgroundColor, color: s.color, borderColor: s.borderColor, boxShadow: s.boxShadow, cursor: s.cursor };
+        });
+        // Move the mouse away so the next element's "resting" read in
+        // this same loop isn't still under a hover state from this one.
+        await this.page.mouse.move(0, 0).catch(() => {});
+
+        const hasVisibleHoverFeedback =
+          hoveredStyle.backgroundColor !== restingStyle.backgroundColor ||
+          hoveredStyle.color !== restingStyle.color ||
+          hoveredStyle.borderColor !== restingStyle.borderColor ||
+          hoveredStyle.boxShadow !== restingStyle.boxShadow ||
+          (hoveredStyle.cursor === "pointer" && restingStyle.cursor !== "pointer");
+
+        results.push({ selector, hasVisibleHoverFeedback });
+      } catch {
+        // Same convention as checkFocusIndicators: omit rather than guess.
+      }
+    }
+
+    return results;
+  }
+
+  async checkExpandableToggles(
+    selectors: string[]
+  ): Promise<import("./browser-adapter").ExpandableToggleResult[]> {
+    if (!this.page) return [];
+    const results: import("./browser-adapter").ExpandableToggleResult[] = [];
+
+    for (const selector of selectors) {
+      try {
+        const locator = this.page.locator(selector).first();
+        if ((await locator.count()) === 0) continue;
+
+        const before = await locator.evaluate((el) => ({
+          expanded: el.getAttribute("aria-expanded"),
+          controlsId: el.getAttribute("aria-controls"),
+        }));
+        const controlsVisibleBefore = before.controlsId
+          ? await this.page
+              .locator(`#${before.controlsId}`)
+              .first()
+              .isVisible()
+              .catch(() => null)
+          : null;
+
+        await locator.click({ timeout: 2000 });
+        // Let any open/close transition settle before reading state —
+        // a short fixed wait rather than waiting on a specific
+        // transitionend event, since the target markup is unknown.
+        await this.page.waitForTimeout(300);
+
+        const after = await locator.evaluate((el) => el.getAttribute("aria-expanded"));
+        const controlsVisibleAfter = before.controlsId
+          ? await this.page
+              .locator(`#${before.controlsId}`)
+              .first()
+              .isVisible()
+              .catch(() => null)
+          : null;
+
+        // Restore original state so this check doesn't leave the page
+        // altered for anything that reads it afterward.
+        await locator.click({ timeout: 2000 }).catch(() => {});
+        await this.page.waitForTimeout(150);
+
+        const ariaFlipped = before.expanded !== null && after !== null && before.expanded !== after;
+        const controlsVisibilityTracked =
+          controlsVisibleBefore === null || controlsVisibleAfter === null
+            ? true // no aria-controls target found — can't check this part, don't penalize for it
+            : controlsVisibleBefore !== controlsVisibleAfter;
+
+        results.push({
+          selector,
+          toggledCorrectly: ariaFlipped && controlsVisibilityTracked,
+          ariaControlsSelector: before.controlsId ? `#${before.controlsId}` : undefined,
+        });
+      } catch {
+        // Click or evaluate failed outright — omit rather than guess.
+      }
+    }
+
+    return results;
+  }
+
   async close(): Promise<void> {
     await this.page?.close().catch(() => {});
     await this.context?.close().catch(() => {});
