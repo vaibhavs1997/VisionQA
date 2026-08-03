@@ -41,6 +41,8 @@ import { blockedCriticalResourceDetector } from "./seo/blocked-critical-resource
 import { fontSizeTooSmallDetector } from "./accessibility/font-size-too-small.detector";
 import { imageAspectRatioDistortedDetector } from "./image/image-aspect-ratio-distorted.detector";
 import { brokenLinkDetector } from "./network/broken-link.detector";
+import { missingFocusIndicatorDetector } from "./accessibility/missing-focus-indicator.detector";
+import { positiveTabindexDetector } from "./accessibility/positive-tabindex.detector";
 
 /**
  * The full Phase 1 detector set — 17 detectors behind the plugin
@@ -86,6 +88,8 @@ export const PHASE_1_DETECTORS: Detector[] = [
   fontSizeTooSmallDetector,
   imageAspectRatioDistortedDetector,
   brokenLinkDetector,
+  missingFocusIndicatorDetector,
+  positiveTabindexDetector,
 ];
 
 /** @deprecated kept as an alias so any Phase 0 reference doesn't break; use PHASE_1_DETECTORS. */

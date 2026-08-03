@@ -225,6 +225,51 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
     }
   }
 
+  async checkFocusIndicators(
+    selectors: string[]
+  ): Promise<import("./browser-adapter").FocusCheckResult[]> {
+    if (!this.page) return [];
+    const results: import("./browser-adapter").FocusCheckResult[] = [];
+
+    for (const selector of selectors) {
+      try {
+        const locator = this.page.locator(selector).first();
+        if ((await locator.count()) === 0) continue;
+
+        // Read the resting (unfocused) style first, then focus and read
+        // again — some elements have a permanent border/shadow
+        // regardless of focus state, so it's the *change* on focus that
+        // indicates a real indicator, not just "some outline exists."
+        const blurredStyle = await locator.evaluate((el) => {
+          const s = getComputedStyle(el as Element);
+          return { outlineStyle: s.outlineStyle, outlineWidth: s.outlineWidth, boxShadow: s.boxShadow, borderColor: s.borderColor };
+        });
+
+        await locator.focus({ timeout: 2000 });
+        const focusedStyle = await locator.evaluate((el) => {
+          const s = getComputedStyle(el as Element);
+          return { outlineStyle: s.outlineStyle, outlineWidth: s.outlineWidth, boxShadow: s.boxShadow, borderColor: s.borderColor };
+        });
+        await locator.evaluate((el) => (el as HTMLElement).blur()).catch(() => {});
+
+        const hasVisibleFocusIndicator =
+          (focusedStyle.outlineStyle !== "none" && focusedStyle.outlineWidth !== "0px") ||
+          (focusedStyle.boxShadow !== "none" && focusedStyle.boxShadow !== blurredStyle.boxShadow) ||
+          focusedStyle.borderColor !== blurredStyle.borderColor;
+
+        results.push({ selector, hasVisibleFocusIndicator });
+      } catch {
+        // Selector didn't resolve cleanly, or focus()/evaluate() threw
+        // (e.g. the element became detached, or genuinely isn't
+        // focusable despite looking interactive) — omit rather than
+        // guess at a result for it, same convention as fetchExternal
+        // failures for a single link.
+      }
+    }
+
+    return results;
+  }
+
   async close(): Promise<void> {
     await this.page?.close().catch(() => {});
     await this.context?.close().catch(() => {});

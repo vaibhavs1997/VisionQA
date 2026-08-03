@@ -35,6 +35,11 @@ export interface ExternalFetchResult {
   error?: string;
 }
 
+export interface FocusCheckResult {
+  selector: string;
+  hasVisibleFocusIndicator: boolean;
+}
+
 /**
  * The Browser Adapter is the ONLY module allowed to import a browser
  * automation library. Everything above this boundary — detectors, the
@@ -59,5 +64,15 @@ export interface BrowserAdapter {
    * down the scan the way an unhandled rejection would.
    */
   fetchExternal(url: string, timeoutMs?: number): Promise<ExternalFetchResult>;
+  /**
+   * Actually focuses each given element (in DOM/tab order — this is real
+   * interaction, not a static snapshot) and diffs its computed style
+   * against its own unfocused baseline to determine whether a focus
+   * event produces any visible change (outline, box-shadow, or border
+   * color). Selectors that don't resolve to exactly one element, or that
+   * error out on focus, are simply omitted from the result rather than
+   * guessed at.
+   */
+  checkFocusIndicators(selectors: string[]): Promise<FocusCheckResult[]>;
   close(): Promise<void>;
 }

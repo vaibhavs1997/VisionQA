@@ -6,7 +6,13 @@ export type DataDependency =
   | "network"
   | "console"
   | "screenshots"
-  | "geometry";
+  | "geometry"
+  /** Data from actually interacting with the page (focusing elements,
+   * pressing keys) rather than a single static snapshot — e.g.
+   * `page.focusIndicatorChecks`. Distinct from "dom" so it's obvious at
+   * a glance which detectors depend on the (more expensive, capped)
+   * interaction-simulation pass. */
+  | "interaction";
 
 /**
  * Every detector — deterministic, computer-vision, OCR, or AI — implements

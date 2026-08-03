@@ -184,6 +184,11 @@ export interface LinkCheck {
   error?: string;
 }
 
+export interface FocusIndicatorCheck {
+  selector: string;
+  hasVisibleFocusIndicator: boolean;
+}
+
 export interface PageContext {
   scan: {
     scanId: string;
@@ -217,6 +222,16 @@ export interface PageContext {
      * NOT the same as it being confirmed working.
      */
     linkChecks?: LinkCheck[];
+    /**
+     * Focus-visibility results for a capped sample of interactive
+     * elements, obtained by actually focusing each one and diffing its
+     * computed style against its unfocused baseline (see
+     * `checkFocusIndicators` on the Browser Adapter) — this is the one
+     * PageContext field that requires genuine interaction simulation
+     * rather than a single static DOM snapshot. A selector absent from
+     * this array wasn't sampled, same convention as `linkChecks`.
+     */
+    focusIndicatorChecks?: FocusIndicatorCheck[];
   };
   elements: ElementSnapshot[];
   images: ImageSnapshot[];

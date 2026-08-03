@@ -9,6 +9,7 @@ import {
   SvgSnapshot,
   SeoSnapshot,
   LinkCheck,
+  FocusIndicatorCheck,
 } from "@ui-quality/shared";
 import { BrowserAdapter } from "../browser/browser-adapter";
 import { assertUrlIsSafe } from "../security/url-security-guard";
@@ -146,6 +147,7 @@ export async function collectPageContext(
 
   const seo = await collectSeoSnapshot(adapter, navResult.finalUrl, rawSeoMeta, options);
   const linkChecks = await collectLinkChecks(adapter, elements, navResult.finalUrl, options);
+  const focusIndicatorChecks = await collectFocusIndicatorChecks(adapter, elements, viewport);
 
   const pageContext: PageContext = {
     scan: {
@@ -170,6 +172,7 @@ export async function collectPageContext(
       hasHorizontalScroll: raw.hasHorizontalScroll,
       seo,
       linkChecks,
+      focusIndicatorChecks,
     },
     elements,
     images,
@@ -301,4 +304,39 @@ async function collectLinkChecks(
   );
 
   return results.filter((r): r is LinkCheck => r !== null);
+}
+
+// Unlike the SEO/link checks (a handful of network fetches), each focus
+// check is a real interaction — focus, two style reads, blur — so this
+// is gated to the desktop viewport at the SOURCE, not just at the
+// detector level: there's no value in cycling focus through the same
+// elements three times over when the result won't vary by viewport, and
+// the added time cost per element is real enough to be worth skipping
+// entirely on tablet/mobile passes rather than just deduplicating after
+// the fact.
+const MAX_FOCUS_CHECKS = 20;
+
+/**
+ * Samples up to MAX_FOCUS_CHECKS visible interactive elements (in DOM
+ * order — first N, not a "most important" ranking, since that would
+ * need its own judgment call) and actually focuses each one to see
+ * whether a real visible change occurs, via `checkFocusIndicators` on
+ * the Browser Adapter. Never throws: the Adapter method itself already
+ * omits elements it couldn't check cleanly rather than erroring out.
+ */
+async function collectFocusIndicatorChecks(
+  adapter: BrowserAdapter,
+  elements: ElementSnapshot[],
+  viewport: Viewport
+): Promise<FocusIndicatorCheck[]> {
+  if (viewport.name !== "desktop") return [];
+
+  const candidateSelectors = elements
+    .filter((el) => el.isInteractive && el.isVisible)
+    .slice(0, MAX_FOCUS_CHECKS)
+    .map((el) => el.selector);
+
+  if (candidateSelectors.length === 0) return [];
+
+  return adapter.checkFocusIndicators(candidateSelectors);
 }

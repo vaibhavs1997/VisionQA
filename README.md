@@ -1,6 +1,6 @@
 # UI Quality Platform — Phase 0 + Phase 1 + Phase 2
 
-A local CLI scanner that opens a public URL in a real browser, runs 29 deterministic
+A local CLI scanner that opens a public URL in a real browser, runs 31 deterministic
 UI-defect detectors across desktop/tablet/mobile viewports,
 optionally validates the most ambiguous ones with an AI vision layer, and
 writes a JSON report, a self-contained HTML report, and
@@ -199,7 +199,7 @@ export ANTHROPIC_API_KEY=sk-...
 npm run scan -- https://example.com --ai anthropic
 ```
 
-AI only ever runs on 6 of the 29 detectors' issue types
+AI only ever runs on 6 of the 31 detectors' issue types
 (`element-overlap`, ambiguous `broken-svg-icon`, `unexpected-disabled-cta`,
 `low-contrast-borderline`, the class-pattern bucket of `empty-component`,
 and `placeholder-generic-token`) — see the Phase 2 and Phase 5 sections
@@ -270,7 +270,7 @@ UI_SCAN_CHROMIUM_PATH=/path/to/chromium npx tsx benchmarks/src/run-ai-demo.ts
 apps/cli/                   CLI entrypoint (commander) + scan command
 packages/shared/             PageContext, Universal Issue Object, viewport presets
 packages/scanner-core/       URL Security Guard, Browser Adapter, PageContext Collector
-packages/detectors/          29 detectors (image/network/layout/accessibility/technical/content/seo) + plugin registry
+packages/detectors/          31 detectors (image/network/layout/accessibility/technical/content/seo) + plugin registry
 packages/issue-engine/       Validator, Deduplicator, Scoring, Responsive Delta, Assembler, JSON + HTML report writers
 packages/ai-engine/          Provider-agnostic AI layer: providers, prompts, schemas, crop/annotation/context builders, redaction, cost tracker
 packages/ocr/                Real tesseract.js-based OCR adapter (not wired into any detector by default)
@@ -695,6 +695,42 @@ link would be reported three times over. 6 new tests.
 same-origin-vs-external link scope is currently "both" by default (no
 signal from the person building this to scope it down), and multi-
 browser (Firefox/WebKit) support wasn't touched this pass.
+
+**Tier 2 begun: real interaction simulation (29 → 31 detectors).**
+Every detector before this point ran against a single static DOM
+snapshot. This is the first architecture change that requires actually
+*doing* something to the page rather than just reading it:
+`BrowserAdapter` gained a `checkFocusIndicators(selectors)` method that
+focuses each given element for real (`locator.focus()`) and diffs its
+computed style (`outline`, `box-shadow`, `border-color`) against its
+own unfocused baseline — the *change* is what indicates a real focus
+style, since some elements have a permanent border regardless of focus
+state. A new `DataDependency` kind, `"interaction"`, marks which
+detectors depend on this pass so it's visible at a glance which ones
+need more than a snapshot.
+- `missing-focus-indicator-v1` (accessibility, critical severity):
+  flags interactive elements where focusing produces no visible
+  change at all — arguably the single highest-impact keyboard-
+  accessibility failure, since it's not "harder to tell where you
+  are," it's "no way to tell at all."
+- `positive-tabindex-v1` (accessibility): a purely static companion
+  check — positive `tabindex` values are the single most
+  well-documented cause of illogical tab order, so this needed no
+  interaction simulation at all, just reading the `tabindex` attribute
+  already captured in `attributes`.
+
+Together these close the "tab order" and "focus indicators" checklist
+items. Sampling is capped at 20 elements and gated to the desktop
+viewport at the *collection* source (not just the detector, unlike the
+SEO/link checks) — each focus check is a real interaction with a
+meaningfully higher per-element cost than a network fetch, so there's
+no reason to pay that cost three times over for a result that won't
+vary by viewport. 7 new tests.
+
+**Still open from Tier 2:** hover/active-state screenshot diffing and
+dropdown/menu expand-collapse verification — both would reuse the same
+interaction-simulation foundation just built, but weren't tackled this
+pass.
 
 **Still open** (see "Known limitations" above, which still applies):
 billing/Stripe, transactional email, error tracking, DB backups, and a
