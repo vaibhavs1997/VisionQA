@@ -40,6 +40,7 @@ import { robotsAndSitemapDetector } from "./seo/robots-and-sitemap.detector";
 import { blockedCriticalResourceDetector } from "./seo/blocked-critical-resource.detector";
 import { fontSizeTooSmallDetector } from "./accessibility/font-size-too-small.detector";
 import { imageAspectRatioDistortedDetector } from "./image/image-aspect-ratio-distorted.detector";
+import { brokenLinkDetector } from "./network/broken-link.detector";
 
 /**
  * The full Phase 1 detector set — 17 detectors behind the plugin
@@ -84,6 +85,7 @@ export const PHASE_1_DETECTORS: Detector[] = [
   blockedCriticalResourceDetector,
   fontSizeTooSmallDetector,
   imageAspectRatioDistortedDetector,
+  brokenLinkDetector,
 ];
 
 /** @deprecated kept as an alias so any Phase 0 reference doesn't break; use PHASE_1_DETECTORS. */

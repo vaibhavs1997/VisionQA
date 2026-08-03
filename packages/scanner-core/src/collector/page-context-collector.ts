@@ -8,6 +8,7 @@ import {
   FontFaceSnapshot,
   SvgSnapshot,
   SeoSnapshot,
+  LinkCheck,
 } from "@ui-quality/shared";
 import { BrowserAdapter } from "../browser/browser-adapter";
 import { assertUrlIsSafe } from "../security/url-security-guard";
@@ -144,6 +145,7 @@ export async function collectPageContext(
   const rawSeoMeta = (raw as any).seoMeta ?? {};
 
   const seo = await collectSeoSnapshot(adapter, navResult.finalUrl, rawSeoMeta, options);
+  const linkChecks = await collectLinkChecks(adapter, elements, navResult.finalUrl, options);
 
   const pageContext: PageContext = {
     scan: {
@@ -167,6 +169,7 @@ export async function collectPageContext(
       scrollHeight: raw.scrollHeight,
       hasHorizontalScroll: raw.hasHorizontalScroll,
       seo,
+      linkChecks,
     },
     elements,
     images,
@@ -236,4 +239,66 @@ async function collectSeoSnapshot(
   }
 
   return seo;
+}
+
+// Bounds worst-case added latency/cost to roughly MAX_LINKS_TO_CHECK *
+// LINK_CHECK_TIMEOUT_MS per viewport (so ~75s across all 3 viewports in
+// the worst case, in parallel per-viewport not serial across them) —
+// deliberately conservative rather than checking every link on a page
+// that might have hundreds.
+const MAX_LINKS_TO_CHECK = 15;
+const LINK_CHECK_TIMEOUT_MS = 5000;
+const SKIPPABLE_HREF_PREFIXES = ["mailto:", "tel:", "javascript:", "#"];
+
+/**
+ * Checks reachability for a capped sample of unique same-page link
+ * targets. Runs through the same URL Security Guard as the main scan
+ * target — a link pointing at an internal/private address is exactly the
+ * kind of thing the guard exists to catch, so those targets are silently
+ * skipped (not flagged as "broken") rather than fetched.
+ *
+ * Deliberately best-effort and non-blocking: a network hiccup checking
+ * one link must never fail the whole scan, so every failure mode here
+ * reduces to "this link just wasn't included in the results," which
+ * `broken-link-v1` treats as "not sampled" rather than "confirmed OK."
+ */
+async function collectLinkChecks(
+  adapter: BrowserAdapter,
+  elements: ElementSnapshot[],
+  finalUrl: string,
+  options: CollectPageContextOptions
+): Promise<LinkCheck[]> {
+  const uniqueUrls = new Set<string>();
+
+  for (const el of elements) {
+    if (el.tagName !== "a") continue;
+    const href = el.attributes.href;
+    if (!href) continue;
+    if (SKIPPABLE_HREF_PREFIXES.some((prefix) => href.trim().toLowerCase().startsWith(prefix))) continue;
+
+    let resolved: URL;
+    try {
+      resolved = new URL(href, finalUrl);
+    } catch {
+      continue; // unparseable href — not this check's concern
+    }
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") continue;
+
+    uniqueUrls.add(resolved.toString());
+    if (uniqueUrls.size >= MAX_LINKS_TO_CHECK) break;
+  }
+
+  const results = await Promise.all(
+    Array.from(uniqueUrls).map(async (url): Promise<LinkCheck | null> => {
+      try {
+        if (!options.skipUrlGuardForBenchmarkFixturesOnly) await assertUrlIsSafe(url);
+      } catch {
+        return null; // security-guard-blocked target — silently excluded, not flagged broken
+      }
+      const result = await adapter.fetchExternal(url, LINK_CHECK_TIMEOUT_MS);
+      return { url, ok: result.ok, status: result.status, error: result.error };
+    })
+  );
+
+  return results.filter((r): r is LinkCheck => r !== null);
 }

@@ -1,7 +1,7 @@
 # UI Quality Platform — Phase 0 + Phase 1 + Phase 2
 
-A local CLI scanner that opens a public URL in a real browser, runs 28
-deterministic UI-defect detectors across desktop/tablet/mobile viewports,
+A local CLI scanner that opens a public URL in a real browser, runs 29 deterministic
+UI-defect detectors across desktop/tablet/mobile viewports,
 optionally validates the most ambiguous ones with an AI vision layer, and
 writes a JSON report, a self-contained HTML report, and
 screenshots/evidence to disk. This covers Phase 0 (technical
@@ -199,7 +199,7 @@ export ANTHROPIC_API_KEY=sk-...
 npm run scan -- https://example.com --ai anthropic
 ```
 
-AI only ever runs on 6 of the 28 detectors' issue types
+AI only ever runs on 6 of the 29 detectors' issue types
 (`element-overlap`, ambiguous `broken-svg-icon`, `unexpected-disabled-cta`,
 `low-contrast-borderline`, the class-pattern bucket of `empty-component`,
 and `placeholder-generic-token`) — see the Phase 2 and Phase 5 sections
@@ -270,7 +270,7 @@ UI_SCAN_CHROMIUM_PATH=/path/to/chromium npx tsx benchmarks/src/run-ai-demo.ts
 apps/cli/                   CLI entrypoint (commander) + scan command
 packages/shared/             PageContext, Universal Issue Object, viewport presets
 packages/scanner-core/       URL Security Guard, Browser Adapter, PageContext Collector
-packages/detectors/          28 detectors (image/network/layout/accessibility/technical/content/seo) + plugin registry
+packages/detectors/          29 detectors (image/network/layout/accessibility/technical/content/seo) + plugin registry
 packages/issue-engine/       Validator, Deduplicator, Scoring, Responsive Delta, Assembler, JSON + HTML report writers
 packages/ai-engine/          Provider-agnostic AI layer: providers, prompts, schemas, crop/annotation/context builders, redaction, cost tracker
 packages/ocr/                Real tesseract.js-based OCR adapter (not wired into any detector by default)
@@ -640,7 +640,7 @@ clear that gate on its own first. The system prompt's framing was also
 generalized from "geometrically ambiguous" to cover contrast/content
 ambiguity too. 5 new tests across the detector and `ai-service` suites.
 
-**Tier 1 checklist coverage (22 → 28 detectors, new `seo` category).**
+**Tier 1 checklist coverage (22 → 29 detectors, new `seo` category).**
 Closed the SEO/crawler-visibility checklist section from zero to
 covered, plus two more zero-collector-change detectors:
 - `meta-tags-v1`: missing/malformed meta description, `noindex` robots
@@ -672,14 +672,29 @@ viewport's candidates, not across a scan's three viewports, so without
 that gate every SEO issue would be reported three times over. 29 new
 tests.
 
-**Deliberately deferred: broken-link checking.** Fetching every unique
-`<a href>` on a page to check for 404s was scoped as a Tier 1 item but
-cut here — unlike a single robots.txt fetch, it's a genuinely different
-cost/risk shape (potentially dozens of external requests per scan,
-adding real latency, and a larger SSRF-adjacent surface even with the
-URL Security Guard applied per-link) that deserves a deliberate call on
-link-count caps and same-origin-vs-external scope rather than a default
-buried in a detector.
+**Broken-link checking (`broken-link-v1`).** Built after initially
+deferring it — the cost/risk shape genuinely differs from a single
+robots.txt fetch, so this went in with explicit bounds rather than
+guessing: capped to the first 15 unique `<a href>` targets per page
+(`MAX_LINKS_TO_CHECK` in `page-context-collector.ts`), 5s timeout per
+link, every target run through the same URL Security Guard the main
+scan navigation uses (a link pointing at an internal/private address is
+silently excluded, not flagged "broken" — that's the guard doing its
+job, not a scan failure), and the whole check is best-effort: a network
+hiccup on one link degrades to "not sampled," never fails the scan.
+Reachability results land in the new `page.linkChecks` field, computed
+once during collection (same pattern as `page.seo`) so the detector
+itself stays a plain synchronous function over already-assembled data,
+consistent with every other detector in this codebase. Gated to the
+desktop viewport only, same reasoning as the SEO detectors: link
+reachability doesn't vary by viewport, and issues aren't deduplicated
+across a scan's three viewports, so without the gate a single broken
+link would be reported three times over. 6 new tests.
+
+**Still open, deliberately left as future work rather than guessed at:**
+same-origin-vs-external link scope is currently "both" by default (no
+signal from the person building this to scope it down), and multi-
+browser (Firefox/WebKit) support wasn't touched this pass.
 
 **Still open** (see "Known limitations" above, which still applies):
 billing/Stripe, transactional email, error tracking, DB backups, and a

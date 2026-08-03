@@ -177,6 +177,13 @@ export interface SeoSnapshot {
   sitemap?: SitemapCheck;
 }
 
+export interface LinkCheck {
+  url: string;
+  ok: boolean;
+  status?: number;
+  error?: string;
+}
+
 export interface PageContext {
   scan: {
     scanId: string;
@@ -202,6 +209,14 @@ export interface PageContext {
      * fixtures) and any environment where the robots.txt/sitemap fetch
      * itself failed outright won't have this populated. */
     seo?: SeoSnapshot;
+    /**
+     * Reachability results for a capped sample of unique `<a href>`
+     * targets on the page (see `collectLinkChecks` for the cap and
+     * timeout). Absent entirely if link checking wasn't run; a link
+     * whose target isn't in this array simply wasn't sampled, which is
+     * NOT the same as it being confirmed working.
+     */
+    linkChecks?: LinkCheck[];
   };
   elements: ElementSnapshot[];
   images: ImageSnapshot[];
