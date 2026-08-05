@@ -8,6 +8,7 @@ import { runMigrations } from "@ui-quality/database";
 import { LocalFilesystemObjectStorage } from "@ui-quality/storage";
 import { buildApp } from "../app";
 import { resetRateLimits } from "../services/rate-limiter";
+import { closeRedisClient } from "@ui-quality/queue";
 
 const TEST_DB_URL =
   process.env.TEST_DATABASE_URL ?? "postgres://uiquality:uiquality_dev@localhost:5432/ui_quality_test";
@@ -24,6 +25,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await pool.end();
+  await closeRedisClient();
 });
 
 beforeEach(async () => {
@@ -37,7 +39,7 @@ beforeEach(async () => {
     signingSecret: "test-secret",
   });
   app = await buildApp({ pool, storage, enqueueScan: enqueueStub });
-  resetRateLimits();
+  await resetRateLimits();
   enqueueStub.mockClear();
 });
 

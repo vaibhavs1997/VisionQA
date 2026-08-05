@@ -19,7 +19,7 @@ const loginSchema = z.object({
 
 export function registerAuthRoutes(app: FastifyInstance, pool: Pool) {
   app.post("/api/auth/register", async (request, reply) => {
-    const rateLimitResult = checkRateLimit(request.ip, "auth_register");
+    const rateLimitResult = await checkRateLimit(request.ip, "auth_register");
     if (!rateLimitResult.allowed) {
       return reply.code(429).send({ error: "rate_limited", retryAfterMs: rateLimitResult.retryAfterMs });
     }
@@ -46,7 +46,7 @@ export function registerAuthRoutes(app: FastifyInstance, pool: Pool) {
   });
 
   app.post("/api/auth/login", async (request, reply) => {
-    const rateLimitResult = checkRateLimit(request.ip, "auth_login");
+    const rateLimitResult = await checkRateLimit(request.ip, "auth_login");
     if (!rateLimitResult.allowed) {
       return reply.code(429).send({ error: "rate_limited", retryAfterMs: rateLimitResult.retryAfterMs });
     }

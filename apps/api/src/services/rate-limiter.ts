@@ -1,45 +1,69 @@
-interface Bucket {
-  count: number;
-  windowStartedAt: number;
-}
+import { getRedisClient } from "@ui-quality/queue";
 
-const buckets = new Map<string, Bucket>();
-
-// Deliberately generous for a Phase 3 demo — the point is to have a real,
-// working rate-limit seam (matching the spec's "rate limit scan creation
-// by user/session/IP" requirement) rather than to tune production
-// thresholds, which depend on real traffic data this phase doesn't have
-// yet. A distributed deployment (Phase 4) will need this backed by Redis
-// instead of an in-memory Map, since this doesn't survive a process
-// restart or work across multiple API instances — noted here rather than
-// silently assumed to scale.
+// Was an in-memory Map (Phase 3) — noted then as not surviving a
+// process restart or working across multiple API instances. This is
+// that fix: every API instance hits the same Redis, so a limit is
+// actually a limit regardless of which instance served the request or
+// whether one of them restarted mid-window.
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 10;
+const KEY_PREFIX = "ratelimit:";
 
 export interface RateLimitResult {
   allowed: boolean;
   retryAfterMs?: number;
 }
 
-export function checkRateLimit(key: string, action: string): RateLimitResult {
-  const bucketKey = `${action}:${key}`;
-  const now = Date.now();
-  const bucket = buckets.get(bucketKey);
+export interface RateLimitOptions {
+  windowMs?: number;
+  maxPerWindow?: number;
+}
 
-  if (!bucket || now - bucket.windowStartedAt >= WINDOW_MS) {
-    buckets.set(bucketKey, { count: 1, windowStartedAt: now });
+// INCR + PEXPIRE-on-first-increment, as one atomic Lua script — doing
+// this as two separate commands (INCR then check-and-EXPIRE) has a race:
+// two requests arriving in the same millisecond could both see count===1
+// and both set the expiry, which is harmless, but a crash or slow client
+// between the two commands could leave a key with no expiry at all,
+// leaking memory forever. The script closes that gap.
+const INCR_AND_MAYBE_EXPIRE = `
+local current = redis.call("INCR", KEYS[1])
+if current == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+return current
+`;
+
+/**
+ * Fails OPEN, not closed: if Redis is unreachable, requests are allowed
+ * through rather than rejected. A rate limiter that takes down the
+ * entire API when its own backing store hiccups is a worse outcome
+ * than temporarily under-enforcing a limit — same reasoning as the
+ * broken-link and SEO checks elsewhere in this codebase being
+ * best-effort rather than hard dependencies of the thing they support.
+ */
+export async function checkRateLimit(key: string, action: string, options: RateLimitOptions = {}): Promise<RateLimitResult> {
+  const windowMs = options.windowMs ?? WINDOW_MS;
+  const maxPerWindow = options.maxPerWindow ?? MAX_PER_WINDOW;
+  const bucketKey = `${KEY_PREFIX}${action}:${key}`;
+
+  try {
+    const redis = getRedisClient();
+    const current = (await redis.eval(INCR_AND_MAYBE_EXPIRE, 1, bucketKey, windowMs)) as number;
+
+    if (current > maxPerWindow) {
+      const ttl = await redis.pttl(bucketKey);
+      return { allowed: false, retryAfterMs: ttl > 0 ? ttl : windowMs };
+    }
+    return { allowed: true };
+  } catch (err) {
+    console.warn(`Rate limiter: Redis unavailable, failing open for "${action}":`, err instanceof Error ? err.message : err);
     return { allowed: true };
   }
-
-  if (bucket.count >= MAX_PER_WINDOW) {
-    return { allowed: false, retryAfterMs: WINDOW_MS - (now - bucket.windowStartedAt) };
-  }
-
-  bucket.count++;
-  return { allowed: true };
 }
 
 /** Test/dev helper — clears all rate-limit state. */
-export function resetRateLimits(): void {
-  buckets.clear();
+export async function resetRateLimits(): Promise<void> {
+  const redis = getRedisClient();
+  const keys = await redis.keys(`${KEY_PREFIX}*`);
+  if (keys.length > 0) await redis.del(...keys);
 }

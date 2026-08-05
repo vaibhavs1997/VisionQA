@@ -805,7 +805,45 @@ reviewed-but-not-yet-implemented stub from Phase 4
 `BACKUP_S3_BUCKET`/AWS credentials are added as repo secrets, uncomment
 the `schedule:` block in that workflow file to run it daily.
 
-**Still open**: the shared Redis-backed rate limiter, billing/Stripe,
-transactional email, error tracking, and legal/compliance basics —
-see "Known limitations" above, which still applies to everything not
-mentioned in this Phase 5 section.
+## Production readiness: shared Redis-backed rate limiter
+
+The in-memory rate limiter from Phase 3 had a documented, known gap:
+it didn't survive a process restart and didn't work across multiple
+API instances, since each instance kept its own local `Map`. This
+replaces it.
+
+`apps/api/src/services/rate-limiter.ts` now checks Redis instead —
+every API instance hits the same counters, so a limit is an actual
+limit regardless of which instance served a given request. The
+increment-and-set-expiry is one atomic Lua script (`INCR` then
+`PEXPIRE` only on the first increment within a window), not two
+separate commands — doing it as two commands has a real race: a crash
+or slow client between them could leave a key with no expiry at all,
+leaking forever.
+
+**Fails open, deliberately.** If Redis is unreachable, requests are
+allowed through rather than rejected — a rate limiter that takes down
+the whole API when its own backing store hiccups is a worse outcome
+than temporarily under-enforcing a limit. This caught a real bug
+during development: ioredis's default retry behavior is up to 20
+retries per command with backoff, which can take many seconds — during
+an outage that would make every request *hang* for that long before
+"failing open," which defeats the purpose. The dedicated Redis client
+this uses (`packages/queue/src/redis-client.ts`, separate from BullMQ's
+own queue connection) is configured with `maxRetriesPerRequest: 1` and
+a 2s connect timeout specifically so the fail-open path is actually
+fast. There's a test for this exact property —
+`apps/api/src/__tests__/rate-limiter-fail-open.test.ts` — that
+deliberately points at an unreachable Redis and asserts the response
+comes back in under 5 seconds; unlike every other Redis-dependent test
+in this repo, this one is designed to pass with *no* Redis available
+at all, which is exactly what let it catch the slow-failure bug in this
+sandbox before it ever reached CI.
+
+6 more tests cover the normal path against real Redis (per-key and
+per-action isolation, window expiry, `resetRateLimits`) in
+`apps/api/src/__tests__/rate-limiter.test.ts`.
+
+**Still open**: billing/Stripe, transactional email, error tracking,
+and legal/compliance basics — see "Known limitations" above, which
+still applies to everything not mentioned in this Phase 5 section.

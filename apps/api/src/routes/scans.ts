@@ -51,7 +51,7 @@ export function registerScanRoutes(app: FastifyInstance, pool: Pool, storage: Ob
     "/api/workspaces/:workspaceId/scans",
     { preHandler: guards },
     async (request, reply) => {
-      const rateLimitResult = checkRateLimit(request.ip, "create_scan");
+      const rateLimitResult = await checkRateLimit(request.ip, "create_scan");
       if (!rateLimitResult.allowed) {
         return reply.code(429).send({ error: "rate_limited", retryAfterMs: rateLimitResult.retryAfterMs });
       }
