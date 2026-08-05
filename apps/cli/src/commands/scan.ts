@@ -16,9 +16,11 @@ import {
   writeReport,
   writeHtmlReport,
   applyResponsiveDelta,
+  deduplicateViewportInvariantIssues,
   ScanReportMeta,
 } from "@ui-quality/issue-engine";
 import { AiProvider, AnthropicProvider, MockAiProvider, AiCostTracker, enhanceWithAi } from "@ui-quality/ai-engine";
+import { ScanInsights, parseProjectSettings } from "@ui-quality/shared";
 
 export interface ScanCommandOptions {
   url: string;
@@ -31,6 +33,8 @@ export interface ScanCommandOptions {
    * requires ANTHROPIC_API_KEY). Defaults to "off" so a scan never
    * incurs AI cost or requires a key unless explicitly requested. */
   ai?: "off" | "mock" | "anthropic";
+  /** Optional project-style scan settings (link cap, axe, etc.). */
+  scanSettings?: ReturnType<typeof parseProjectSettings>;
 }
 
 function resolveAiProvider(mode: "off" | "mock" | "anthropic"): AiProvider | null {
@@ -50,6 +54,7 @@ export async function runScanCommand(options: ScanCommandOptions): Promise<{
   const aiMode = options.ai ?? "off";
   const aiProvider = resolveAiProvider(aiMode);
   const aiCostTracker = new AiCostTracker();
+  const scanSettings = options.scanSettings ?? parseProjectSettings({});
   const aiEvidenceDir = path.join(options.outDir, "ai-evidence");
   if (aiProvider) fs.mkdirSync(aiEvidenceDir, { recursive: true });
 
@@ -57,6 +62,8 @@ export async function runScanCommand(options: ScanCommandOptions): Promise<{
   let finalUrl = options.url;
   let anyViewportFailed = false;
   let allViewportsFailed = true;
+
+  let scanInsights: ScanInsights = {};
 
   for (const viewport of viewports) {
     const viewportOutDir = path.join(options.outDir, "screenshots");
@@ -71,7 +78,19 @@ export async function runScanCommand(options: ScanCommandOptions): Promise<{
         viewport,
         outDir: viewportOutDir,
         navigationTimeoutMs: options.navigationTimeoutMs,
+        linkCheck: {
+          maxLinksToCheck: scanSettings.maxLinksToCheck,
+          scope: scanSettings.linkCheckScope,
+        },
+        runAxe: scanSettings.runAxe,
       });
+
+      if (viewport.name === "desktop") {
+        scanInsights = {
+          navigation: pageContext.page.navigation,
+          linkCheck: pageContext.page.linkCheckMeta,
+        };
+      }
 
       finalUrl = pageContext.page.finalUrl;
       allViewportsFailed = false;
@@ -139,7 +158,9 @@ export async function runScanCommand(options: ScanCommandOptions): Promise<{
   // are assembled, since it compares the same root cause across
   // viewports — something no single-viewport detector run can see.
   const viewportNames = viewports.map((v) => String(v.name));
-  const correlatedIssues = applyResponsiveDelta(allIssues, viewportNames);
+  const correlatedIssues = deduplicateViewportInvariantIssues(
+    applyResponsiveDelta(allIssues, viewportNames)
+  );
 
   // Score is computed globally across all viewports/issues collected.
   const scoreInputs = correlatedIssues.map((issue) => ({
@@ -160,6 +181,7 @@ export async function runScanCommand(options: ScanCommandOptions): Promise<{
     status: anyViewportFailed ? "partially_completed" : "completed",
     viewports: viewportNames,
     score,
+    scanInsights,
     ...(aiProvider
       ? {
           aiTelemetry: {

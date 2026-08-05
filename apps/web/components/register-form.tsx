@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
+import { registerErrorMessage } from "@/lib/auth-form-errors";
 import { setClientToken } from "@/lib/session";
 
 export function RegisterForm() {
@@ -22,9 +23,7 @@ export function RegisterForm() {
       router.push("/");
       router.refresh();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) setError("An account with that email already exists.");
-      else if (err instanceof ApiError && err.status === 400) setError("Password must be at least 8 characters.");
-      else setError("Something went wrong.");
+      setError(registerErrorMessage(err));
       setSubmitting(false);
     }
   }

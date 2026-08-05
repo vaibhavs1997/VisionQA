@@ -4,7 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json && mkdir -p dist/migrations && cp -r ../../packages/database/migrations/*.sql dist/migrations/",
+    "build": "tsc -p tsconfig.json && node -e \"const fs=require('fs');const p='dist/migrations';fs.mkdirSync(p,{recursive:true});for(const f of fs.readdirSync('migrations').filter(x=>x.endsWith('.sql'))) fs.copyFileSync('migrations/'+f,p+'/'+f);\"",
     "migrate": "tsx src/migrate.ts",
     "backup": "tsx src/backup.ts",
     "restore": "tsx src/restore.ts"

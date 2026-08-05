@@ -1,0 +1,34 @@
+name: UI Scan (reusable)
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Public URL to scan
+        required: true
+  pull_request:
+    paths:
+      - "ui-quality-platform/**"
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui-quality-platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui-quality-platform/package-lock.json
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+      - run: npm run build
+      - name: Run CLI scan
+        env:
+          UI_SCAN_URL: ${{ github.event.inputs.url || secrets.UI_SCAN_URL }}
+        run: |
+          if [ -z "$UI_SCAN_URL" ]; then echo "Set workflow input url or UI_SCAN_URL secret"; exit 0; fi
+          npm run scan -- "$UI_SCAN_URL" --viewports desktop --out ./scan-out

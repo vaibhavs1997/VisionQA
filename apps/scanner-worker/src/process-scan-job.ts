@@ -2,15 +2,17 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Pool } from "pg";
-import { resolveViewports, Viewport, UiIssue } from "@ui-quality/shared";
-import { PlaywrightBrowserAdapter, collectPageContext } from "@ui-quality/scanner-core";
-import { DetectorRegistry } from "@ui-quality/detectors";
+import { resolveViewports, Viewport, UiIssue, parseProjectSettings, ScanInsights, CrawlMode } from "@ui-quality/shared";
+import { PlaywrightBrowserAdapter, collectPageContext, assertUrlIsSafe } from "@ui-quality/scanner-core";
+import { DetectorRegistry, OPTIONAL_DETECTORS } from "@ui-quality/detectors";
+import { discoverUrls } from "@ui-quality/crawler";
 import {
   validateCandidates,
   deduplicateCandidates,
   computeUiQualityScore,
   assembleIssues,
   applyResponsiveDelta,
+  deduplicateViewportInvariantIssues,
 } from "@ui-quality/issue-engine";
 import { AiProvider, AnthropicProvider, MockAiProvider, AiCostTracker, enhanceWithAi } from "@ui-quality/ai-engine";
 import { ObjectStorage } from "@ui-quality/storage";
@@ -22,6 +24,7 @@ import {
   insertIssues,
   IssueRow,
   recordUsageEvent,
+  getScan,
 } from "@ui-quality/database";
 import { ScanJobPayload, ScanJobResult } from "@ui-quality/queue";
 
@@ -41,12 +44,14 @@ function resolveAiProvider(mode: "off" | "mock" | "anthropic"): AiProvider | nul
 async function uploadScreenshots(
   storage: ObjectStorage,
   scanId: string,
+  pageUrl: string,
   viewportName: string,
   localScreenshotPaths: { path: string; kind: string }[]
 ): Promise<string[]> {
+  const pageKey = Buffer.from(pageUrl).toString("base64url").slice(0, 16);
   const keys: string[] = [];
   for (const shot of localScreenshotPaths) {
-    const key = `scans/${scanId}/screenshots/${viewportName}-${shot.kind === "full-page" ? "full" : "viewport"}.png`;
+    const key = `scans/${scanId}/screenshots/${pageKey}-${viewportName}-${shot.kind === "full-page" ? "full" : "viewport"}.png`;
     const body = fs.readFileSync(shot.path);
     await storage.putObject({ key, body, contentType: "image/png" });
     keys.push(key);
@@ -101,10 +106,18 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
   const { pool, storage } = deps;
   const { scanId } = payload;
   const viewports: Viewport[] = resolveViewports(payload.viewports);
-  const registry = new DetectorRegistry();
+  const projectSettings = parseProjectSettings(payload.projectSettings);
+  const crawlMode: CrawlMode = payload.crawlMode ?? projectSettings.defaultCrawlMode;
+  const maxPages = payload.maxPages ?? projectSettings.defaultMaxPages;
+  const registry = new DetectorRegistry().withOptional(projectSettings.runAxe ? OPTIONAL_DETECTORS : []);
   const aiProvider = resolveAiProvider(payload.aiMode);
   const aiCostTracker = new AiCostTracker();
   const startedAtMs = Date.now();
+
+  const existing = await getScan(pool, payload.workspaceId, scanId);
+  if (existing?.status === "FAILED" && existing.failureReason === "Cancelled by user") {
+    return { status: "FAILED", failureReason: "Cancelled by user" };
+  }
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `scan-worker-${scanId}-`));
   const allIssues: UiIssue[] = [];
@@ -114,8 +127,39 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
 
   await updateScanProgress(pool, scanId, { status: "INITIALIZING" });
 
+  const discoverAdapter = new PlaywrightBrowserAdapter({ executablePath: deps.chromiumExecutablePath });
+  let pageUrls = [payload.requestedUrl];
   try {
-    for (const viewport of viewports) {
+    await discoverAdapter.open();
+    pageUrls = await discoverUrls({
+      mode: crawlMode,
+      entryUrl: payload.requestedUrl,
+      maxPages,
+      fetchText: async (url) => {
+        try {
+          await assertUrlIsSafe(url);
+        } catch {
+          return { ok: false };
+        }
+        const res = await discoverAdapter.fetchExternal(url);
+        return { ok: res.ok, body: res.body, status: res.status };
+      },
+    });
+  } catch {
+    pageUrls = [payload.requestedUrl];
+  } finally {
+    await discoverAdapter.close();
+  }
+
+  let scanInsights: ScanInsights = {
+    crawl: { mode: crawlMode, pagesPlanned: pageUrls.length, pagesCompleted: 0, urls: pageUrls },
+    detectorChecklist: registry.list().map((d) => ({ id: d.id, category: d.category, ran: true })),
+  };
+
+  try {
+    let pagesCompleted = 0;
+    for (const pageUrl of pageUrls) {
+      for (const viewport of viewports) {
       const adapter = new PlaywrightBrowserAdapter({ executablePath: deps.chromiumExecutablePath });
       const viewportOutDir = path.join(tempDir, viewport.name);
 
@@ -124,11 +168,23 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
 
         const pageContext = await collectPageContext(adapter, {
           scanId,
-          requestedUrl: payload.requestedUrl,
+          requestedUrl: pageUrl,
           viewport,
           outDir: viewportOutDir,
+          linkCheck: {
+            maxLinksToCheck: projectSettings.maxLinksToCheck,
+            scope: projectSettings.linkCheckScope,
+          },
+          runAxe: projectSettings.runAxe,
         });
         finalUrl = pageContext.page.finalUrl;
+        if (viewport.name === "desktop" && pageUrl === pageUrls[0]) {
+          scanInsights = {
+            ...scanInsights,
+            navigation: pageContext.page.navigation,
+            linkCheck: pageContext.page.linkCheckMeta,
+          };
+        }
         allViewportsFailed = false;
 
         await updateScanProgress(pool, scanId, { status: "RUNNING_DETECTORS", currentStep: `viewport:${viewport.name}` });
@@ -158,7 +214,7 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
 
         await updateScanProgress(pool, scanId, { status: "PROCESSING_RESULTS", currentStep: `viewport:${viewport.name}` });
 
-        const screenshotKeys = await uploadScreenshots(storage, scanId, viewport.name, pageContext.screenshots);
+        const screenshotKeys = await uploadScreenshots(storage, scanId, pageUrl, viewport.name, pageContext.screenshots);
         const scanPage = await createScanPage(pool, {
           scanId,
           url: pageContext.page.finalUrl,
@@ -187,6 +243,9 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
         await adapter.close();
       }
     }
+      pagesCompleted += 1;
+      if (scanInsights.crawl) scanInsights.crawl.pagesCompleted = pagesCompleted;
+    }
 
     if (allViewportsFailed) {
       deps.metrics?.scanJobsTotal.inc({ status: "FAILED" });
@@ -196,7 +255,9 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
     }
 
     const viewportNames = viewports.map((v) => String(v.name));
-    const correlatedIssues = applyResponsiveDelta(allIssues, viewportNames);
+    const correlatedIssues = deduplicateViewportInvariantIssues(
+      applyResponsiveDelta(allIssues, viewportNames)
+    );
 
     const scoreInputs = correlatedIssues.map((issue) => ({
       issue: { candidate: issue, affectedElementCount: issue.affectedElementCount },
@@ -230,6 +291,8 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
       status,
       finalUrl,
       score,
+      scanMetadata: scanInsights as unknown as Record<string, unknown>,
+      pagesCompleted: scanInsights.crawl?.pagesCompleted,
       aiTelemetry: aiSummary
         ? {
             provider: aiProvider!.name,

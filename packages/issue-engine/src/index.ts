@@ -5,3 +5,5 @@ export * from "./assemble";
 export * from "./report-writer";
 export * from "./responsive-delta";
 export * from "./html-report";
+export * from "./global-dedupe";
+export * from "./visual-regression";

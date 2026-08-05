@@ -1,6 +1,6 @@
 import path from "node:path";
-import sharp from "sharp";
 import { BoundingBox } from "@ui-quality/shared";
+import { getSharp } from "./load-sharp";
 
 export interface CropOptions {
   /** Extra pixels of surrounding context on each side, so the model sees
@@ -40,6 +40,9 @@ export async function buildCrop(
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   try {
+    const sharp = await getSharp();
+    if (!sharp) return null;
+
     const image = sharp(sourceScreenshotPath);
     const metadata = await image.metadata();
     const sourceWidth = metadata.width ?? 0;

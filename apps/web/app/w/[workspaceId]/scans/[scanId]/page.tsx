@@ -5,6 +5,9 @@ import { IssueCard } from "@/components/issue-card";
 import { IssueFilterBar } from "@/components/issue-filter-bar";
 import { ScanProgressPoller } from "@/components/scan-progress-poller";
 import { ScreenshotViewer } from "@/components/screenshot-viewer";
+import { ScanInsightsPanel } from "@/components/scan-insights-panel";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 const TERMINAL_STATUSES = new Set(["COMPLETED", "PARTIALLY_COMPLETED", "FAILED"]);
 
@@ -39,7 +42,9 @@ export default async function ScanPage({
         <div className="viewfinder rounded-lg border border-critical/30 bg-critical-soft p-6 text-critical">
           <span className="vf-br" />
           <span className="vf-bl" />
-          <p className="font-medium text-critical-ink">Scan failed</p>
+          <p className="font-medium text-critical-ink">
+            {scan.failureReason === "Cancelled by user" ? "Scan cancelled" : "Scan failed"}
+          </p>
           <p className="mt-1 text-sm text-critical-ink/80">{scan.failureReason ?? "An unknown error occurred."}</p>
         </div>
       )}
@@ -47,6 +52,18 @@ export default async function ScanPage({
       {isTerminal && scan.status !== "FAILED" && (
         <>
           <ScorePanel score={scan.score} summary={summary} />
+
+          <ScanInsightsPanel insights={scan.scanMetadata as Record<string, unknown> | undefined} />
+
+          <p className="text-sm">
+            <a
+              className="font-mono text-signal hover:underline"
+              href={`${API_URL}/api/workspaces/${params.workspaceId}/scans/${scan.id}/export.csv`}
+            >
+              Export issues (CSV)
+            </a>
+            <span className="text-ink-faint"> — requires session cookie / Bearer in browser extensions</span>
+          </p>
 
           {scan.status === "PARTIALLY_COMPLETED" && (
             <div className="rounded-lg border border-medium/30 bg-medium-soft p-4 text-sm text-medium-ink">

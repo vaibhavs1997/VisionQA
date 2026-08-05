@@ -11,6 +11,7 @@ export interface ScanReportMeta {
   status: "completed" | "partially_completed" | "failed";
   viewports: string[];
   score: number;
+  scanInsights?: import("@ui-quality/shared").ScanInsights;
   /** Present only when Phase 2 AI validation ran during this scan.
    * Loosely typed here (rather than importing AiTelemetrySummary from
    * @ui-quality/ai-engine) so issue-engine's only dependency stays

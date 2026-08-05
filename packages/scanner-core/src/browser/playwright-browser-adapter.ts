@@ -38,6 +38,7 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
   private context: BrowserContext | null = null;
   private page: Page | null = null;
   private redirectCount = 0;
+  private redirectChain: string[] = [];
   private resources: NetworkResource[] = [];
   private consoleMessages: ConsoleMessage[] = [];
   private readonly options: Required<PlaywrightAdapterOptions>;
@@ -94,13 +95,20 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
 
         if (status >= 300 && status < 400) {
           this.redirectCount += 1;
+          const location = response.headers()["location"];
+          if (request.resourceType() === "document") {
+            this.redirectChain.push(response.url());
+            if (location) {
+              try {
+                this.redirectChain.push(new URL(location, response.url()).toString());
+              } catch {
+                /* ignore bad location */
+              }
+            }
+          }
           assertRedirectCountAllowed(this.redirectCount, {
             maxRedirects: this.options.maxRedirects,
           });
-          // Re-validate the redirect target against the URL guard —
-          // this is what defends against a safe initial URL redirecting
-          // to an internal/private target.
-          const location = response.headers()["location"];
           if (location) {
             const resolved = new URL(location, response.url());
             await assertUrlIsSafe(resolved.toString());
@@ -142,6 +150,9 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
   async navigate(url: string, viewport: Viewport, timeoutMs: number): Promise<NavigateResult> {
     if (!this.page) throw new Error("BrowserAdapter.open() must be called before navigate().");
 
+    this.redirectCount = 0;
+    this.redirectChain = [url];
+
     await this.page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     let loadState: NavigateResult["loadState"] = "loaded";
@@ -168,13 +179,20 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
       loadState = "timeout";
     }
 
+    const finalUrl = this.page.url();
+    if (this.redirectChain[this.redirectChain.length - 1] !== finalUrl) {
+      this.redirectChain.push(finalUrl);
+    }
+
     return {
-      finalUrl: this.page.url(),
+      finalUrl,
       title: await this.page.title().catch(() => ""),
       statusCode,
       loadState,
       resources: this.resources,
       consoleMessages: this.consoleMessages,
+      redirectChain: [...new Set(this.redirectChain)],
+      redirectCount: Math.max(0, this.redirectCount),
     };
   }
 
@@ -380,5 +398,27 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
     this.page = null;
     this.context = null;
     this.browser = null;
+  }
+
+  async runAxeAnalysis(): Promise<
+    { id: string; impact?: string; description: string; help: string; helpUrl: string; selector: string }[]
+  > {
+    if (!this.page) return [];
+    try {
+      const { AxeBuilder } = await import("@axe-core/playwright");
+      const results = await new AxeBuilder({ page: this.page }).analyze();
+      return results.violations.flatMap((v) =>
+        v.nodes.slice(0, 5).map((node) => ({
+          id: v.id,
+          impact: v.impact == null ? undefined : String(v.impact),
+          description: v.description,
+          help: v.help,
+          helpUrl: v.helpUrl,
+          selector: node.target.join(" "),
+        }))
+      );
+    } catch {
+      return [];
+    }
   }
 }

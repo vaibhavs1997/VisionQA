@@ -2,13 +2,9 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "module": "Node16",
+    "moduleResolution": "Node16"
   },
-  "references": [
-    { "path": "../../packages/database" },
-    { "path": "../../packages/queue" },
-    { "path": "../../packages/storage" },
-    { "path": "../../packages/observability" }
-  ],
-  "include": ["src"]
+  "include": ["src/**/*"]
 }

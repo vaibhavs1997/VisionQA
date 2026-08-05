@@ -1,7 +1,7 @@
 import { Project, Scan, ScanPage, IssueSummary, UiIssue, User, Workspace } from "./types";
 import { getClientToken, getServerToken } from "./session";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 export class ApiError extends Error {
   constructor(
@@ -58,7 +58,14 @@ export const api = {
 
   createScan: (
     workspaceId: string,
-    input: { projectId: string; url?: string; viewports: string[]; options?: { ai: string } }
+    input: {
+      projectId: string;
+      url?: string;
+      viewports: string[];
+      crawlMode?: string;
+      maxPages?: number;
+      options?: { ai: string };
+    }
   ) =>
     request<{ scanId: string; status: string }>(`/api/workspaces/${workspaceId}/scans`, {
       method: "POST",
@@ -67,6 +74,11 @@ export const api = {
   getScanStatus: (workspaceId: string, scanId: string) =>
     request<{ status: Scan["status"]; currentStep: string | null; issueCount?: number }>(
       `/api/workspaces/${workspaceId}/scans/${scanId}/status`
+    ),
+  cancelScan: (workspaceId: string, scanId: string) =>
+    request<{ scanId: string; status: string; failureReason: string }>(
+      `/api/workspaces/${workspaceId}/scans/${scanId}/cancel`,
+      { method: "POST" }
     ),
   getScan: (workspaceId: string, scanId: string) =>
     request<{ scan: Scan; summary: IssueSummary; pages: ScanPage[] }>(`/api/workspaces/${workspaceId}/scans/${scanId}`),
@@ -92,4 +104,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ feedback }),
     }),
+
+  getProjectTrends: (workspaceId: string, projectId: string) =>
+    request<{ trends: { scanId: string; createdAt: string; score: number | null; totalIssues: number; status: string }[] }>(
+      `/api/workspaces/${workspaceId}/projects/${projectId}/trends`
+    ),
 };

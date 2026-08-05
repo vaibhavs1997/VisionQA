@@ -45,6 +45,8 @@ import { missingFocusIndicatorDetector } from "./accessibility/missing-focus-ind
 import { positiveTabindexDetector } from "./accessibility/positive-tabindex.detector";
 import { missingHoverFeedbackDetector } from "./content/missing-hover-feedback.detector";
 import { brokenExpandableToggleDetector } from "./technical/broken-expandable-toggle.detector";
+import { navigationRedirectDetector } from "./network/navigation-redirect.detector";
+import { soft404Detector } from "./content/soft-404.detector";
 
 /**
  * The full Phase 1 detector set — 17 detectors behind the plugin
@@ -94,6 +96,8 @@ export const PHASE_1_DETECTORS: Detector[] = [
   positiveTabindexDetector,
   missingHoverFeedbackDetector,
   brokenExpandableToggleDetector,
+  navigationRedirectDetector,
+  soft404Detector,
 ];
 
 /** @deprecated kept as an alias so any Phase 0 reference doesn't break; use PHASE_1_DETECTORS. */
@@ -104,6 +108,10 @@ export class DetectorRegistry {
 
   list(): Detector[] {
     return this.detectors;
+  }
+
+  withOptional(extra: Detector[]): DetectorRegistry {
+    return new DetectorRegistry([...this.detectors, ...extra]);
   }
 
   async runAll(context: PageContext): Promise<IssueCandidate[]> {

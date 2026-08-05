@@ -9,6 +9,9 @@ export interface ScanJobPayload {
   requestedUrl: string;
   viewports: string[];
   aiMode: "off" | "mock" | "anthropic";
+  crawlMode?: "single" | "sitemap" | "bfs";
+  maxPages?: number;
+  projectSettings?: Record<string, unknown>;
 }
 
 export interface ScanJobResult {
@@ -55,6 +58,23 @@ export async function closeScanQueue(): Promise<void> {
     await scanQueue.close();
     scanQueue = null;
   }
+}
+
+/** Remove a scan job from the queue (waiting/delayed) or fail an active job. */
+export async function cancelQueuedScanJob(scanId: string): Promise<"removed" | "failed" | "missing"> {
+  const queue = getScanQueue();
+  const job = await queue.getJob(scanId);
+  if (!job) return "missing";
+  const state = await job.getState();
+  if (state === "waiting" || state === "delayed") {
+    await job.remove();
+    return "removed";
+  }
+  if (state === "active") {
+    await job.discard();
+    return "failed";
+  }
+  return "missing";
 }
 
 export async function enqueueScan(payload: ScanJobPayload): Promise<string> {

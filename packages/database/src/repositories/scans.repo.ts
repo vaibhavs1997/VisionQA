@@ -25,6 +25,10 @@ export interface Scan {
   failureReason: string | null;
   score: number | null;
   aiTelemetry: Record<string, unknown> | null;
+  scanMetadata: Record<string, unknown>;
+  crawlMode: string;
+  pagesPlanned: number | null;
+  pagesCompleted: number | null;
   jobId: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -44,6 +48,10 @@ interface ScanRow {
   failure_reason: string | null;
   score: number | null;
   ai_telemetry: Record<string, unknown> | null;
+  scan_metadata: Record<string, unknown>;
+  crawl_mode: string;
+  pages_planned: number | null;
+  pages_completed: number | null;
   job_id: string | null;
   started_at: Date | null;
   completed_at: Date | null;
@@ -64,6 +72,10 @@ function toScan(row: ScanRow): Scan {
     failureReason: row.failure_reason,
     score: row.score,
     aiTelemetry: row.ai_telemetry,
+    scanMetadata: row.scan_metadata ?? {},
+    crawlMode: row.crawl_mode ?? "single",
+    pagesPlanned: row.pages_planned,
+    pagesCompleted: row.pages_completed,
     jobId: row.job_id,
     startedAt: row.started_at?.toISOString() ?? null,
     completedAt: row.completed_at?.toISOString() ?? null,
@@ -73,12 +85,28 @@ function toScan(row: ScanRow): Scan {
 
 export async function createScan(
   pool: Pool,
-  input: { projectId: string; workspaceId: string; requestedUrl: string; viewports: string[]; aiMode: string }
+  input: {
+    projectId: string;
+    workspaceId: string;
+    requestedUrl: string;
+    viewports: string[];
+    aiMode: string;
+    crawlMode?: string;
+    pagesPlanned?: number;
+  }
 ): Promise<Scan> {
   const result = await pool.query<ScanRow>(
-    `INSERT INTO scans (project_id, workspace_id, requested_url, viewports, ai_mode, status)
-     VALUES ($1, $2, $3, $4, $5, 'QUEUED') RETURNING *`,
-    [input.projectId, input.workspaceId, input.requestedUrl, JSON.stringify(input.viewports), input.aiMode]
+    `INSERT INTO scans (project_id, workspace_id, requested_url, viewports, ai_mode, crawl_mode, pages_planned, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'QUEUED') RETURNING *`,
+    [
+      input.projectId,
+      input.workspaceId,
+      input.requestedUrl,
+      JSON.stringify(input.viewports),
+      input.aiMode,
+      input.crawlMode ?? "single",
+      input.pagesPlanned ?? null,
+    ]
   );
   return toScan(result.rows[0]);
 }
@@ -109,17 +137,22 @@ export async function completeScan(
     score?: number;
     failureReason?: string;
     aiTelemetry?: Record<string, unknown>;
+    scanMetadata?: Record<string, unknown>;
+    pagesCompleted?: number;
   }
 ): Promise<void> {
   await pool.query(
     `UPDATE scans SET status = $1, final_url = $2, score = $3, failure_reason = $4,
-       ai_telemetry = $5, completed_at = now() WHERE id = $6`,
+       ai_telemetry = $5, scan_metadata = COALESCE($6, scan_metadata),
+       pages_completed = COALESCE($7, pages_completed), completed_at = now() WHERE id = $8`,
     [
       update.status,
       update.finalUrl ?? null,
       update.score ?? null,
       update.failureReason ?? null,
       update.aiTelemetry ? JSON.stringify(update.aiTelemetry) : null,
+      update.scanMetadata ? JSON.stringify(update.scanMetadata) : null,
+      update.pagesCompleted ?? null,
       scanId,
     ]
   );
@@ -141,6 +174,45 @@ export async function listScansForProject(pool: Pool, workspaceId: string, proje
     [projectId, workspaceId]
   );
   return result.rows.map(toScan);
+}
+
+export interface ScanTrendPoint {
+  scanId: string;
+  createdAt: string;
+  score: number | null;
+  status: ScanStatus;
+  totalIssues: number;
+}
+
+export async function listProjectScanTrends(
+  pool: Pool,
+  workspaceId: string,
+  projectId: string,
+  limit = 30
+): Promise<ScanTrendPoint[]> {
+  const result = await pool.query<{
+    id: string;
+    created_at: Date;
+    score: number | null;
+    status: ScanStatus;
+    total_issues: string;
+  }>(
+    `SELECT s.id, s.created_at, s.score, s.status,
+       (SELECT COUNT(*)::text FROM issues i WHERE i.scan_id = s.id) AS total_issues
+     FROM scans s
+     WHERE s.project_id = $1 AND s.workspace_id = $2
+       AND s.status IN ('COMPLETED', 'PARTIALLY_COMPLETED')
+     ORDER BY s.created_at DESC
+     LIMIT $3`,
+    [projectId, workspaceId, limit]
+  );
+  return result.rows.map((row) => ({
+    scanId: row.id,
+    createdAt: row.created_at.toISOString(),
+    score: row.score,
+    status: row.status,
+    totalIssues: Number.parseInt(row.total_issues, 10),
+  }));
 }
 
 export async function countRecentScansForWorkspace(pool: Pool, workspaceId: string, sinceIso: string): Promise<number> {

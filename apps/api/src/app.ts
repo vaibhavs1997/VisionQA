@@ -9,6 +9,10 @@ import { registerWorkspaceRoutes } from "./routes/workspaces";
 import { registerProjectRoutes } from "./routes/projects";
 import { registerScanRoutes } from "./routes/scans";
 import { registerIssueRoutes } from "./routes/issues";
+import { registerScheduleRoutes } from "./routes/schedules";
+import { registerTrendRoutes } from "./routes/trends";
+import { registerExportRoutes } from "./routes/export";
+import { registerBillingRoutes } from "./routes/billing";
 
 export interface BuildAppOptions {
   pool: Pool;
@@ -29,7 +33,21 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   const app = Fastify({ logger: false });
 
   await app.register(cors, {
-    origin: options.corsOrigins ?? ["http://localhost:3000"],
+    origin:
+      process.env.CORS_ALLOW_LOCALHOST === "1" || process.env.LOG_PRETTY === "1"
+        ? (origin, cb) => {
+            if (!origin) {
+              cb(null, true);
+              return;
+            }
+            if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+              cb(null, true);
+              return;
+            }
+            const allowed = options.corsOrigins ?? ["http://localhost:3000"];
+            cb(null, allowed.includes(origin));
+          }
+        : (options.corsOrigins ?? ["http://localhost:3000"]),
   });
 
   // Request-duration tracking for every route — cheap, and it's exactly
@@ -86,6 +104,10 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   registerProjectRoutes(app, options.pool);
   registerScanRoutes(app, options.pool, options.storage, { enqueue: options.enqueueScan });
   registerIssueRoutes(app, options.pool);
+  registerScheduleRoutes(app, options.pool);
+  registerTrendRoutes(app, options.pool);
+  registerExportRoutes(app, options.pool);
+  registerBillingRoutes(app, options.pool);
 
   return app;
 }

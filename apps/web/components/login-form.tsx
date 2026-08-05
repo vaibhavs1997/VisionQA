@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/api-client";
+import { api } from "@/lib/api-client";
+import { loginErrorMessage } from "@/lib/auth-form-errors";
 import { setClientToken } from "@/lib/session";
 
 export function LoginForm() {
@@ -22,7 +23,7 @@ export function LoginForm() {
       router.push("/");
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 401 ? "Incorrect email or password." : "Something went wrong.");
+      setError(loginErrorMessage(err));
       setSubmitting(false);
     }
   }

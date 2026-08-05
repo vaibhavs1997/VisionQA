@@ -2,6 +2,7 @@ import Link from "next/link";
 import { api } from "@/lib/api-client";
 import { ScanForm } from "@/components/scan-form";
 import { Badge } from "@/components/ui/badge";
+import { ProjectTrendsPanel } from "@/components/project-trends-panel";
 
 const STATUS_TONE: Record<string, "signal" | "warning" | "neutral"> = {
   COMPLETED: "signal",
@@ -12,6 +13,7 @@ const STATUS_TONE: Record<string, "signal" | "warning" | "neutral"> = {
 export default async function ProjectPage({ params }: { params: { workspaceId: string; projectId: string } }) {
   const project = await api.getProject(params.workspaceId, params.projectId);
   const { scans } = await api.listScansForProject(params.workspaceId, params.projectId);
+  const { trends } = await api.getProjectTrends(params.workspaceId, params.projectId).catch(() => ({ trends: [] }));
 
   return (
     <div className="space-y-8">
@@ -24,6 +26,8 @@ export default async function ProjectPage({ params }: { params: { workspaceId: s
       </div>
 
       <ScanForm workspaceId={params.workspaceId} projectId={project.id} />
+
+      <ProjectTrendsPanel trends={trends} />
 
       <div>
         <h2 className="label-eyebrow mb-3">Scan history ({scans.length})</h2>

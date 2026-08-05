@@ -191,6 +191,33 @@ export async function getRelatedIssues(
   return result.rows.map(fromPgRow);
 }
 
+export async function updateIssueWorkflow(
+  pool: Pool,
+  workspaceId: string,
+  issueId: string,
+  update: { workflowStatus?: string; assigneeUserId?: string | null }
+): Promise<boolean> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+  if (update.workflowStatus) {
+    sets.push(`workflow_status = $${idx++}`);
+    params.push(update.workflowStatus);
+  }
+  if (update.assigneeUserId !== undefined) {
+    sets.push(`assignee_user_id = $${idx++}`);
+    params.push(update.assigneeUserId);
+  }
+  if (sets.length === 0) return false;
+  params.push(issueId, workspaceId);
+  const result = await pool.query(
+    `UPDATE issues i SET ${sets.join(", ")}
+     FROM scans s WHERE s.id = i.scan_id AND i.id = $${idx++} AND s.workspace_id = $${idx}`,
+    params
+  );
+  return (result.rowCount ?? 0) > 0;
+}
+
 export async function setIssueFeedback(
   pool: Pool,
   workspaceId: string,

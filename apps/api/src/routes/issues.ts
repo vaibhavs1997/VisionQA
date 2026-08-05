@@ -1,11 +1,16 @@
 import { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { Pool } from "pg";
-import { getIssue, getRelatedIssues, setIssueFeedback, recordAuditEvent } from "@ui-quality/database";
+import { getIssue, getRelatedIssues, setIssueFeedback, recordAuditEvent, updateIssueWorkflow } from "@ui-quality/database";
 import { requireAuth, requireWorkspaceMembership } from "../auth/middleware";
 
 const feedbackSchema = z.object({
   feedback: z.enum(["valid", "false_positive", "ignored"]),
+});
+
+const workflowSchema = z.object({
+  workflowStatus: z.enum(["open", "in_progress", "fixed", "wont_fix"]).optional(),
+  assigneeUserId: z.string().uuid().nullable().optional(),
 });
 
 export function registerIssueRoutes(app: FastifyInstance, pool: Pool) {
@@ -51,6 +56,22 @@ export function registerIssueRoutes(app: FastifyInstance, pool: Pool) {
         detail: parsed.data.feedback,
       });
 
+      return { ok: true };
+    }
+  );
+
+  app.patch<{ Params: { workspaceId: string; issueId: string } }>(
+    "/api/workspaces/:workspaceId/issues/:issueId",
+    { preHandler: guards },
+    async (request, reply) => {
+      const parsed = workflowSchema.safeParse(request.body);
+      if (!parsed.success) return reply.code(400).send({ error: "invalid_request", details: parsed.error.flatten() });
+
+      const updated = await updateIssueWorkflow(pool, request.params.workspaceId, request.params.issueId, {
+        workflowStatus: parsed.data.workflowStatus,
+        assigneeUserId: parsed.data.assigneeUserId,
+      });
+      if (!updated) return reply.code(404).send({ error: "not_found" });
       return { ok: true };
     }
   );

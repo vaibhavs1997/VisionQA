@@ -7,6 +7,9 @@ export interface NavigateResult {
   loadState: "loaded" | "timeout" | "failed";
   resources: NetworkResource[];
   consoleMessages: ConsoleMessage[];
+  /** Ordered URLs visited for the main document navigation (includes final URL). */
+  redirectChain?: string[];
+  redirectCount?: number;
 }
 
 export interface RawElementData {

@@ -184,6 +184,35 @@ export interface LinkCheck {
   error?: string;
 }
 
+export interface LinkCheckMeta {
+  eligibleLinkCount: number;
+  sampledLinkCount: number;
+  maxLinksToCheck: number;
+  scope: "all" | "internal" | "external";
+}
+
+export interface PageNavigationMeta {
+  requestedUrl: string;
+  finalUrl: string;
+  redirectChain: string[];
+  redirectCount: number;
+  crossDomainRedirect: boolean;
+  canonicalUrl?: string;
+  canonicalMismatch: boolean;
+  documentStatusCode?: number;
+}
+
+export type CrawlMode = "single" | "sitemap" | "bfs";
+
+export interface AxeViolationSnapshot {
+  id: string;
+  impact?: string;
+  description: string;
+  help: string;
+  helpUrl: string;
+  selector: string;
+}
+
 export interface FocusIndicatorCheck {
   selector: string;
   hasVisibleFocusIndicator: boolean;
@@ -237,6 +266,12 @@ export interface PageContext {
      * NOT the same as it being confirmed working.
      */
     linkChecks?: LinkCheck[];
+    /** How many links were eligible vs sampled — for coverage reporting in the UI. */
+    linkCheckMeta?: LinkCheckMeta;
+    /** Main-document navigation summary (desktop collection pass). */
+    navigation?: PageNavigationMeta;
+    /** Populated when project settings enable axe-core (desktop only). */
+    axeViolations?: AxeViolationSnapshot[];
     /**
      * Focus-visibility results for a capped sample of interactive
      * elements, obtained by actually focusing each one and diffing its

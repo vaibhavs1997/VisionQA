@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./registry";
+export * from "./optional-registry";
 export * from "./image/broken-image.detector";
 export * from "./network/failed-resource.detector";
 export * from "./layout/horizontal-overflow.detector";

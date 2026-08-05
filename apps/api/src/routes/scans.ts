@@ -5,6 +5,7 @@ import {
   getProject,
   createScan,
   attachJobId,
+  completeScan,
   getScan,
   getScanPages,
   listScansForProject,
@@ -12,7 +13,7 @@ import {
   summarizeIssues,
   getIssuesForScan,
 } from "@ui-quality/database";
-import { enqueueScan, ScanJobPayload } from "@ui-quality/queue";
+import { enqueueScan, cancelQueuedScanJob, ScanJobPayload } from "@ui-quality/queue";
 import { requireAuth, requireWorkspaceMembership } from "../auth/middleware";
 import { recordAuditEvent } from "@ui-quality/database";
 import { checkRateLimit } from "../services/rate-limiter";
@@ -21,6 +22,8 @@ const createScanSchema = z.object({
   projectId: z.string().min(1),
   url: z.string().url().optional(),
   viewports: z.array(z.enum(["desktop", "tablet", "mobile"])).min(1).default(["desktop", "mobile"]),
+  crawlMode: z.enum(["single", "sitemap", "bfs"]).default("single"),
+  maxPages: z.number().int().min(1).max(100).optional(),
   options: z.object({ ai: z.enum(["off", "mock", "anthropic"]).default("off") }).default({ ai: "off" }),
 });
 
@@ -75,12 +78,16 @@ export function registerScanRoutes(app: FastifyInstance, pool: Pool, storage: Ob
       }
 
       const requestedUrl = parsed.data.url ?? project.baseUrl;
+      const crawlMode = parsed.data.crawlMode ?? "single";
+      const maxPages = parsed.data.maxPages;
       const scan = await createScan(pool, {
         projectId: project.id,
         workspaceId,
         requestedUrl,
         viewports: parsed.data.viewports,
         aiMode: parsed.data.options.ai,
+        crawlMode,
+        pagesPlanned: crawlMode === "single" ? 1 : maxPages,
       });
 
       const jobId = await enqueue({
@@ -90,6 +97,9 @@ export function registerScanRoutes(app: FastifyInstance, pool: Pool, storage: Ob
         requestedUrl,
         viewports: parsed.data.viewports,
         aiMode: parsed.data.options.ai,
+        crawlMode,
+        maxPages,
+        projectSettings: project.settings,
       });
       await attachJobId(pool, scan.id, jobId);
 
@@ -110,6 +120,32 @@ export function registerScanRoutes(app: FastifyInstance, pool: Pool, storage: Ob
           ? await summarizeIssues(pool, scan.id)
           : undefined;
       return { status: scan.status, currentStep: scan.currentStep, issueCount: summary?.totalIssues };
+    }
+  );
+
+  app.post<{ Params: { workspaceId: string; scanId: string } }>(
+    "/api/workspaces/:workspaceId/scans/:scanId/cancel",
+    { preHandler: guards },
+    async (request, reply) => {
+      const scan = await getScan(pool, request.params.workspaceId, request.params.scanId);
+      if (!scan) return reply.code(404).send({ error: "not_found" });
+
+      const terminal = new Set(["COMPLETED", "PARTIALLY_COMPLETED", "FAILED"]);
+      if (terminal.has(scan.status)) {
+        return reply.code(409).send({ error: "scan_not_active", status: scan.status });
+      }
+
+      await cancelQueuedScanJob(scan.id);
+      await completeScan(pool, scan.id, { status: "FAILED", failureReason: "Cancelled by user" });
+      recordAuditEvent(pool, {
+        action: "scan.cancel",
+        workspaceId: request.params.workspaceId,
+        scanId: scan.id,
+        userId: request.user!.id,
+        ip: request.ip,
+      });
+
+      return { scanId: scan.id, status: "FAILED", failureReason: "Cancelled by user" };
     }
   );
 

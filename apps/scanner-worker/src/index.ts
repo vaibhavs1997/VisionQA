@@ -1,6 +1,7 @@
 import http from "node:http";
 import { Pool } from "pg";
 import { Worker } from "bullmq";
+import { loadEnvFile } from "./load-env";
 import { SCAN_QUEUE_NAME, getRedisConnectionOptions, ScanJobPayload, ScanJobResult, getScanQueue } from "@ui-quality/queue";
 import { LocalFilesystemObjectStorage } from "@ui-quality/storage";
 import { updateScanProgress } from "@ui-quality/database";
@@ -12,6 +13,7 @@ const METRICS_PORT = Number.parseInt(process.env.METRICS_PORT ?? "9091", 10);
 const QUEUE_DEPTH_POLL_MS = 10_000;
 
 async function main() {
+  loadEnvFile();
   const logger = createLogger({ service: "scanner-worker" });
   const metrics = createMetricsRegistry();
 

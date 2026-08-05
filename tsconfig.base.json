@@ -8,7 +8,6 @@
     "strict": true,
     "skipLibCheck": true,
     "declaration": true,
-    "composite": true,
     "sourceMap": false,
     "resolveJsonModule": true,
     "outDir": "dist",

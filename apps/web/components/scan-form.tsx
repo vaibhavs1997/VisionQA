@@ -10,6 +10,7 @@ export function ScanForm({ workspaceId, projectId }: { workspaceId: string; proj
   const router = useRouter();
   const [selectedViewports, setSelectedViewports] = useState<string[]>(["desktop", "mobile"]);
   const [aiMode, setAiMode] = useState<"off" | "mock" | "anthropic">("off");
+  const [crawlMode, setCrawlMode] = useState<"single" | "sitemap" | "bfs">("single");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +29,7 @@ export function ScanForm({ workspaceId, projectId }: { workspaceId: string; proj
       const { scanId } = await api.createScan(workspaceId, {
         projectId,
         viewports: selectedViewports,
+        crawlMode,
         options: { ai: aiMode },
       });
       router.push(`/w/${workspaceId}/scans/${scanId}`);
@@ -62,6 +64,19 @@ export function ScanForm({ workspaceId, projectId }: { workspaceId: string; proj
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="mb-5">
+        <p className="mb-2 text-sm font-medium text-ink">Scan scope</p>
+        <select
+          value={crawlMode}
+          onChange={(e) => setCrawlMode(e.target.value as typeof crawlMode)}
+          className="w-full rounded border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-signal focus:outline-none sm:w-auto"
+        >
+          <option value="single">Single URL (project base URL)</option>
+          <option value="sitemap">Sitemap crawl (bounded)</option>
+          <option value="bfs">Same-site link crawl (bounded)</option>
+        </select>
       </div>
 
       <div className="mb-6">

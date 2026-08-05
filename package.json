@@ -8,15 +8,20 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@ui-quality/shared && npm run build --workspace=@ui-quality/storage --workspace=@ui-quality/detectors --workspace=@ui-quality/issue-engine --workspace=@ui-quality/scanner-core --workspace=@ui-quality/ai-engine --workspace=@ui-quality/ocr --workspace=@ui-quality/queue --workspace=@ui-quality/observability && npm run build --workspace=@ui-quality/database && npm run build --workspace=@ui-quality/cli --workspace=@ui-quality/api --workspace=@ui-quality/scanner-worker && npm run build --workspace=@ui-quality/web",
+    "build": "npm run build --workspace=@ui-quality/shared && npm run build --workspace=@ui-quality/crawler && npm run build --workspace=@ui-quality/storage --workspace=@ui-quality/detectors --workspace=@ui-quality/issue-engine --workspace=@ui-quality/scanner-core --workspace=@ui-quality/ai-engine --workspace=@ui-quality/ocr --workspace=@ui-quality/queue --workspace=@ui-quality/observability && npm run build --workspace=@ui-quality/database && npm run build --workspace=@ui-quality/cli --workspace=@ui-quality/api --workspace=@ui-quality/scanner-worker && npm run build --workspace=@ui-quality/web",
     "scan": "tsx apps/cli/src/index.ts",
     "benchmark": "tsx benchmarks/src/run-benchmark.ts",
+    "dev:local": "powershell -ExecutionPolicy Bypass -File scripts/start-local.ps1",
     "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^5.5.4",
+    "@types/node": "^22.5.0",
+    "embedded-postgres": "^18.4.0-beta.17",
     "tsx": "^4.16.5",
-    "vitest": "^2.0.5",
-    "@types/node": "^22.5.0"
+    "typescript": "^6.0.3",
+    "vitest": "^2.0.5"
+  },
+  "optionalDependencies": {
+    "@img/sharp-wasm32": "^0.35.3"
   }
 }

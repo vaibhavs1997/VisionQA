@@ -43,6 +43,8 @@ export interface Scan {
   failureReason: string | null;
   score: number | null;
   aiTelemetry: Record<string, unknown> | null;
+  scanMetadata?: Record<string, unknown> | null;
+  crawlMode?: string;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;

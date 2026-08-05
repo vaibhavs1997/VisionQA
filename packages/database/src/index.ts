@@ -9,3 +9,4 @@ export * from "./repositories/scans.repo";
 export * from "./repositories/issues.repo";
 export * from "./repositories/usage.repo";
 export * from "./repositories/audit.repo";
+export * from "./repositories/schedules.repo";

@@ -9,9 +9,13 @@ import {
   SvgSnapshot,
   SeoSnapshot,
   LinkCheck,
+  LinkCheckMeta,
+  PageNavigationMeta,
   FocusIndicatorCheck,
   HoverFeedbackCheck,
   ExpandableToggleCheck,
+  DEFAULT_MAX_LINKS_TO_CHECK,
+  LinkCheckScope,
 } from "@ui-quality/shared";
 import { BrowserAdapter } from "../browser/browser-adapter";
 import { assertUrlIsSafe } from "../security/url-security-guard";
@@ -66,6 +70,12 @@ export interface CollectPageContextOptions {
    * (correctly) blocked for real scans per the Phase 0 security spec.
    */
   skipUrlGuardForBenchmarkFixturesOnly?: boolean;
+  linkCheck?: {
+    maxLinksToCheck?: number;
+    scope?: LinkCheckScope;
+  };
+  /** Run axe-core analysis after DOM collection (desktop viewport only). */
+  runAxe?: boolean;
 }
 
 /**
@@ -148,10 +158,25 @@ export async function collectPageContext(
   const rawSeoMeta = (raw as any).seoMeta ?? {};
 
   const seo = await collectSeoSnapshot(adapter, navResult.finalUrl, rawSeoMeta, options);
-  const linkChecks = await collectLinkChecks(adapter, elements, navResult.finalUrl, options);
+  const { checks: linkChecks, meta: linkCheckMeta } = await collectLinkChecks(
+    adapter,
+    elements,
+    navResult.finalUrl,
+    options
+  );
   const focusIndicatorChecks = await collectFocusIndicatorChecks(adapter, elements, viewport);
   const hoverFeedbackChecks = await collectHoverFeedbackChecks(adapter, elements, viewport);
   const expandableToggleChecks = await collectExpandableToggleChecks(adapter, elements, viewport);
+
+  const navigation =
+    viewport.name === "desktop"
+      ? buildNavigationMeta(requestedUrl, navResult.finalUrl, navResult, seo?.canonicalUrl)
+      : undefined;
+
+  let axeViolations: PageContext["page"]["axeViolations"];
+  if (options.runAxe && viewport.name === "desktop" && "runAxeAnalysis" in adapter) {
+    axeViolations = await (adapter as { runAxeAnalysis: () => Promise<PageContext["page"]["axeViolations"]> }).runAxeAnalysis();
+  }
 
   const pageContext: PageContext = {
     scan: {
@@ -176,6 +201,9 @@ export async function collectPageContext(
       hasHorizontalScroll: raw.hasHorizontalScroll,
       seo,
       linkChecks,
+      linkCheckMeta,
+      navigation,
+      axeViolations,
       focusIndicatorChecks,
       hoverFeedbackChecks,
       expandableToggleChecks,
@@ -250,14 +278,50 @@ async function collectSeoSnapshot(
   return seo;
 }
 
-// Bounds worst-case added latency/cost to roughly MAX_LINKS_TO_CHECK *
-// LINK_CHECK_TIMEOUT_MS per viewport (so ~75s across all 3 viewports in
-// the worst case, in parallel per-viewport not serial across them) —
-// deliberately conservative rather than checking every link on a page
-// that might have hundreds.
-const MAX_LINKS_TO_CHECK = 15;
+// Default cap raised from 15 → 30; override per project via CollectPageContextOptions.
 const LINK_CHECK_TIMEOUT_MS = 5000;
 const SKIPPABLE_HREF_PREFIXES = ["mailto:", "tel:", "javascript:", "#"];
+
+function buildNavigationMeta(
+  requestedUrl: string,
+  finalUrl: string,
+  navResult: { statusCode?: number; redirectChain?: string[]; redirectCount?: number },
+  canonicalUrl?: string
+): PageNavigationMeta {
+  let requestedHost = "";
+  let finalHost = "";
+  try {
+    requestedHost = new URL(requestedUrl).hostname;
+    finalHost = new URL(finalUrl).hostname;
+  } catch {
+    /* ignore */
+  }
+  const chain = navResult.redirectChain ?? [requestedUrl, finalUrl];
+  let canonicalMismatch = false;
+  if (canonicalUrl) {
+    try {
+      canonicalMismatch = new URL(canonicalUrl).toString() !== new URL(finalUrl).toString();
+    } catch {
+      canonicalMismatch = false;
+    }
+  }
+  return {
+    requestedUrl,
+    finalUrl,
+    redirectChain: chain,
+    redirectCount: navResult.redirectCount ?? Math.max(0, chain.length - 1),
+    crossDomainRedirect: requestedHost !== "" && finalHost !== "" && requestedHost !== finalHost,
+    canonicalUrl,
+    canonicalMismatch,
+    documentStatusCode: navResult.statusCode,
+  };
+}
+
+function linkMatchesScope(resolved: URL, pageOrigin: string, scope: LinkCheckScope): boolean {
+  if (scope === "all") return true;
+  const isInternal = resolved.origin === pageOrigin;
+  return scope === "internal" ? isInternal : !isInternal;
+}
 
 /**
  * Checks reachability for a capped sample of unique same-page link
@@ -276,8 +340,18 @@ async function collectLinkChecks(
   elements: ElementSnapshot[],
   finalUrl: string,
   options: CollectPageContextOptions
-): Promise<LinkCheck[]> {
+): Promise<{ checks: LinkCheck[]; meta: LinkCheckMeta }> {
+  const maxLinksToCheck = options.linkCheck?.maxLinksToCheck ?? DEFAULT_MAX_LINKS_TO_CHECK;
+  const scope = options.linkCheck?.scope ?? "all";
+  let pageOrigin = "";
+  try {
+    pageOrigin = new URL(finalUrl).origin;
+  } catch {
+    return { checks: [], meta: { eligibleLinkCount: 0, sampledLinkCount: 0, maxLinksToCheck, scope } };
+  }
+
   const uniqueUrls = new Set<string>();
+  const allEligible = new Set<string>();
 
   for (const el of elements) {
     if (el.tagName !== "a") continue;
@@ -289,27 +363,41 @@ async function collectLinkChecks(
     try {
       resolved = new URL(href, finalUrl);
     } catch {
-      continue; // unparseable href — not this check's concern
+      continue;
     }
     if (resolved.protocol !== "http:" && resolved.protocol !== "https:") continue;
+    if (!linkMatchesScope(resolved, pageOrigin, scope)) continue;
 
-    uniqueUrls.add(resolved.toString());
-    if (uniqueUrls.size >= MAX_LINKS_TO_CHECK) break;
+    allEligible.add(resolved.toString());
+    if (uniqueUrls.size < maxLinksToCheck) {
+      uniqueUrls.add(resolved.toString());
+    }
   }
+
+  const eligibleLinkCount = allEligible.size;
 
   const results = await Promise.all(
     Array.from(uniqueUrls).map(async (url): Promise<LinkCheck | null> => {
       try {
         if (!options.skipUrlGuardForBenchmarkFixturesOnly) await assertUrlIsSafe(url);
       } catch {
-        return null; // security-guard-blocked target — silently excluded, not flagged broken
+        return null;
       }
       const result = await adapter.fetchExternal(url, LINK_CHECK_TIMEOUT_MS);
       return { url, ok: result.ok, status: result.status, error: result.error };
     })
   );
 
-  return results.filter((r): r is LinkCheck => r !== null);
+  const checks = results.filter((r): r is LinkCheck => r !== null);
+  return {
+    checks,
+    meta: {
+      eligibleLinkCount,
+      sampledLinkCount: checks.length,
+      maxLinksToCheck,
+      scope,
+    },
+  };
 }
 
 // Unlike the SEO/link checks (a handful of network fetches), each focus

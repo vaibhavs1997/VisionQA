@@ -30,6 +30,19 @@ export function ScanProgressPoller({
   const router = useRouter();
   const [status, setStatus] = useState<Scan["status"]>(initialStatus);
   const [currentStep, setCurrentStep] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  async function handleCancel() {
+    if (cancelling || TERMINAL_STATUSES.has(status)) return;
+    setCancelling(true);
+    try {
+      await api.cancelScan(workspaceId, scanId);
+      setStatus("FAILED");
+      router.refresh();
+    } catch {
+      setCancelling(false);
+    }
+  }
 
   useEffect(() => {
     if (TERMINAL_STATUSES.has(status)) return;
@@ -60,9 +73,19 @@ export function ScanProgressPoller({
         <div className="h-full w-1/3 animate-sweep bg-gradient-to-r from-transparent via-signal-soft/60 to-transparent" />
       </div>
       <div className="relative z-10">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="h-2 w-2 animate-pulse-dot rounded-full bg-signal" />
-          <p className="label-eyebrow text-signal-ink">Scan in progress</p>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 animate-pulse-dot rounded-full bg-signal" />
+            <p className="label-eyebrow text-signal-ink">Scan in progress</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={cancelling}
+            className="rounded border border-line px-3 py-1 font-mono text-xs uppercase tracking-wide text-ink-faint hover:border-critical hover:text-critical disabled:opacity-50"
+          >
+            {cancelling ? "Cancelling…" : "Cancel scan"}
+          </button>
         </div>
         <ol className="space-y-2">
           {PIPELINE_STEPS.map((step, i) => {
