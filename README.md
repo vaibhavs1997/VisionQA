@@ -755,6 +755,57 @@ reasoning as the focus check. 6 new tests. This closes Tier 2 — every
 item from that tier (focus indicators, tab order, hover feedback,
 dropdown/menu toggles) is now covered.
 
-**Still open** (see "Known limitations" above, which still applies):
-billing/Stripe, transactional email, error tracking, DB backups, and a
-shared Redis-backed rate limiter.
+## Production readiness: database backups
+
+Shifting from detection-engine breadth back to the original
+production-readiness list, starting with backups (the highest-risk gap
+on that list — a single Postgres instance with real customer data and
+zero backup story).
+
+**`npm run backup --workspace=@ui-quality/database`** — runs `pg_dump`
+in custom format (`-Fc`), uploads the result to object storage under
+`backups/<timestamp>.dump`, then deletes backups older than
+`BACKUP_RETENTION_DAYS` (default 30) — retention only runs *after* the
+new backup is confirmed uploaded, never before, so a failed dump can't
+leave the backup set empty. Storage target: local filesystem by
+default, or S3 if `BACKUP_S3_BUCKET` is set (see
+`packages/database/.env.example`).
+
+**`npm run restore --workspace=@ui-quality/database -- --yes`** —
+restores the newest backup (or `--key=backups/<specific>.dump`) via
+`pg_restore --clean --if-exists`. Requires the explicit `--yes` flag —
+without it, the CLI prints what it *would* do and exits without
+touching the database, since `--clean` drops every existing object
+before recreating it.
+
+Both CLIs shell out to the real `pg_dump`/`pg_restore` binaries
+(`postgresql-client`, not bundled with the `pg` npm driver), which
+aren't available in this project's own sandbox — but unlike other
+sandbox-unverified pieces in this README, this one has real coverage:
+`.github/workflows/ci.yml` now has a **smoke-test step that runs on
+every push** — install `postgresql-client`, insert a row, back up,
+`TRUNCATE` the table, restore, verify the row survived. That's an
+actual `pg_dump → wipe → pg_restore` cycle against real Postgres in
+CI, not a documented-but-unverified claim like the Docker Compose path.
+
+The orchestration logic itself (key naming, retention timing, temp-file
+cleanup on both success and failure) is unit-tested with an injected
+mock in place of the real binary — see
+`packages/database/src/__tests__/backup.test.ts` and `restore.test.ts`
+— so that part doesn't depend on `pg_dump` being installed at all.
+
+**Scheduled automation**: `.github/workflows/backup.yml` exists but is
+**manual-dispatch-only by default**, not on a cron schedule. Reason:
+without `BACKUP_S3_BUCKET` configured, a scheduled run would either
+fail outright or — worse — silently "succeed" writing to an ephemeral
+GitHub Actions runner's local disk, which vanishes when the job ends.
+`S3ObjectStorage` itself is still the same documented,
+reviewed-but-not-yet-implemented stub from Phase 4
+(`packages/storage/src/s3-adapter.ts`) — once that's filled in and
+`BACKUP_S3_BUCKET`/AWS credentials are added as repo secrets, uncomment
+the `schedule:` block in that workflow file to run it daily.
+
+**Still open**: the shared Redis-backed rate limiter, billing/Stripe,
+transactional email, error tracking, and legal/compliance basics —
+see "Known limitations" above, which still applies to everything not
+mentioned in this Phase 5 section.

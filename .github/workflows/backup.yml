@@ -1,0 +1,49 @@
+name: Scheduled DB backup
+
+# Manual-dispatch only by default. This job needs a durable destination
+# (BACKUP_S3_BUCKET + AWS credentials as repo secrets) to be worth
+# running unattended — an ephemeral GitHub Actions runner has no
+# persistent disk, so without S3 configured this would either fail
+# outright (S3ObjectStorage is a documented, not-yet-implemented stub —
+# see packages/storage/src/s3-adapter.ts) or, worse, silently "succeed"
+# by writing a backup to storage that vanishes when the runner
+# terminates. Once BACKUP_S3_BUCKET/AWS secrets are set up AND
+# S3ObjectStorage's commented-out AWS SDK calls are implemented,
+# uncomment the `schedule:` trigger below to run this daily.
+on:
+  workflow_dispatch: {}
+  # schedule:
+  #   - cron: "0 8 * * *"  # 08:00 UTC daily — adjust to your maintenance window
+
+jobs:
+  backup:
+    name: Backup production database
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install postgresql-client (for pg_dump)
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Build database package
+        run: npm run build --workspace=@ui-quality/shared && npm run build --workspace=@ui-quality/storage && npm run build --workspace=@ui-quality/database
+
+      - name: Run backup
+        run: npm run backup --workspace=@ui-quality/database
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          BACKUP_RETENTION_DAYS: "30"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

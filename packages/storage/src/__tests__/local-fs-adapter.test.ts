@@ -99,4 +99,28 @@ describe("LocalFilesystemObjectStorage", () => {
     expect(await storage.getObject("s1/old.png")).toBeNull();
     expect(await storage.getObject("s1/new.png")).not.toBeNull();
   });
+
+  it("lists objects under a prefix, newest first", async () => {
+    await storage.putObject({ key: "backups/a.dump", body: Buffer.from("a"), contentType: "application/octet-stream" });
+    const aPath = path.join(rootDir, "backups/a.dump");
+    fs.utimesSync(aPath, (Date.now() - 10_000) / 1000, (Date.now() - 10_000) / 1000);
+
+    await storage.putObject({ key: "backups/b.dump", body: Buffer.from("bb"), contentType: "application/octet-stream" });
+
+    const results = await storage.listObjects("backups/");
+    expect(results.map((r) => r.key)).toEqual(["backups/b.dump", "backups/a.dump"]);
+  });
+
+  it("returns an empty array for a prefix with no objects", async () => {
+    expect(await storage.listObjects("does-not-exist/")).toEqual([]);
+  });
+
+  it("does not include objects outside the given prefix", async () => {
+    await storage.putObject({ key: "backups/a.dump", body: Buffer.from("a"), contentType: "application/octet-stream" });
+    await storage.putObject({ key: "scans/s1/screenshot.png", body: Buffer.from("b"), contentType: "image/png" });
+
+    const results = await storage.listObjects("backups/");
+    expect(results).toHaveLength(1);
+    expect(results[0].key).toBe("backups/a.dump");
+  });
 });

@@ -69,4 +69,18 @@ export class S3ObjectStorage implements ObjectStorage {
   async deleteObjectsOlderThan(_prefix: string, _olderThanMs: number): Promise<number> {
     throw new Error("not implemented — see module comment");
   }
+
+  async listObjects(_prefix: string): Promise<import("./object-storage").ObjectMetadata[]> {
+    throw new Error("not implemented — see module comment");
+    /*
+    import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
+    const client = new S3Client({ region: this.options.region, endpoint: this.options.endpoint });
+    const response = await client.send(
+      new ListObjectsV2Command({ Bucket: this.options.bucket, Prefix: prefix })
+    );
+    return (response.Contents ?? [])
+      .map((obj) => ({ key: obj.Key!, lastModifiedMs: obj.LastModified?.getTime() ?? 0 }))
+      .sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
+    */
+  }
 }

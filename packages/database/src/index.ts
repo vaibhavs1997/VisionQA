@@ -1,5 +1,7 @@
 export * from "./client";
 export * from "./migrate";
+export * from "./backup";
+export * from "./restore";
 export * from "./repositories/users.repo";
 export * from "./repositories/workspaces.repo";
 export * from "./repositories/projects.repo";

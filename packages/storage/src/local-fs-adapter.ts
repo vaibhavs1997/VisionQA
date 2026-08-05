@@ -105,4 +105,28 @@ export class LocalFilesystemObjectStorage implements ObjectStorage {
   verifySignedAccess(key: string, expiresAtMs: number, token: string) {
     return verifyToken(key, expiresAtMs, token, this.signingSecret);
   }
+
+  async listObjects(prefix: string): Promise<import("./object-storage").ObjectMetadata[]> {
+    const dir = safeJoin(this.rootDir, prefix);
+    if (!fs.existsSync(dir)) return [];
+
+    const results: import("./object-storage").ObjectMetadata[] = [];
+    const rootResolved = path.resolve(this.rootDir);
+
+    function walk(currentDir: string) {
+      for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+        const entryPath = path.join(currentDir, entry.name);
+        if (entry.isDirectory()) {
+          walk(entryPath);
+          continue;
+        }
+        const stat = fs.statSync(entryPath);
+        const key = path.relative(rootResolved, entryPath).split(path.sep).join("/");
+        results.push({ key, lastModifiedMs: stat.mtimeMs });
+      }
+    }
+    walk(dir);
+
+    return results.sort((a, b) => b.lastModifiedMs - a.lastModifiedMs);
+  }
 }
