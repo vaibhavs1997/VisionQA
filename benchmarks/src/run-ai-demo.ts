@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { VIEWPORT_PRESETS } from "@ui-quality/shared";
-import { PlaywrightBrowserAdapter, collectPageContext } from "@ui-quality/scanner-core";
+import { PlaywrightBrowserAdapter, collectPageContext, ScannerNetworkPolicy } from "@ui-quality/scanner-core";
 import { DetectorRegistry } from "@ui-quality/detectors";
 import {
   validateCandidates,
@@ -55,7 +55,8 @@ async function main() {
   const allIssues = [];
   const viewport = VIEWPORT_PRESETS.desktop;
   const url = `http://127.0.0.1:${port}/phase1-layout-issues.html`;
-  const adapter = new PlaywrightBrowserAdapter({ executablePath: process.env.UI_SCAN_CHROMIUM_PATH });
+  const networkPolicy = ScannerNetworkPolicy.forTestFixtures();
+  const adapter = new PlaywrightBrowserAdapter({ executablePath: process.env.UI_SCAN_CHROMIUM_PATH, networkPolicy });
 
   const outDir = path.join(OUT_DIR, "screenshots");
   const pageContext = await collectPageContext(adapter, {
@@ -63,7 +64,7 @@ async function main() {
     requestedUrl: url,
     viewport,
     outDir,
-    skipUrlGuardForBenchmarkFixturesOnly: true,
+    networkPolicy,
   });
 
   const candidates = await registry.runAll(pageContext);

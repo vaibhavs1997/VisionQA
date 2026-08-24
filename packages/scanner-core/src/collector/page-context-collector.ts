@@ -18,7 +18,7 @@ import {
   LinkCheckScope,
 } from "@ui-quality/shared";
 import { BrowserAdapter } from "../browser/browser-adapter";
-import { assertUrlIsSafe } from "../security/url-security-guard";
+import { ScannerNetworkPolicy } from "../security/scanner-network-policy";
 
 /**
  * Best-effort robots.txt parser: finds the `User-agent: *` group (falling
@@ -69,7 +69,7 @@ export interface CollectPageContextOptions {
    * same pipeline at localhost-served fixture pages, since localhost is
    * (correctly) blocked for real scans per the Phase 0 security spec.
    */
-  skipUrlGuardForBenchmarkFixturesOnly?: boolean;
+  networkPolicy?: ScannerNetworkPolicy;
   linkCheck?: {
     maxLinksToCheck?: number;
     scope?: LinkCheckScope;
@@ -94,9 +94,11 @@ export async function collectPageContext(
 
   // Fail closed before a browser is ever opened — except for the internal
   // benchmark harness, which deliberately targets localhost-served fixtures.
-  if (!options.skipUrlGuardForBenchmarkFixturesOnly) {
-    await assertUrlIsSafe(requestedUrl);
-  }
+  const networkPolicy = options.networkPolicy ?? new ScannerNetworkPolicy();
+
+  // Fail closed before a browser is ever opened — except for the internal
+  // benchmark harness, which deliberately targets localhost-served fixtures.
+  await networkPolicy.assertAllowed(requestedUrl);
 
   await adapter.open();
 
@@ -157,12 +159,13 @@ export async function collectPageContext(
   const svgs: SvgSnapshot[] = (raw.svgs as any[]) || [];
   const rawSeoMeta = (raw as any).seoMeta ?? {};
 
-  const seo = await collectSeoSnapshot(adapter, navResult.finalUrl, rawSeoMeta, options);
+  const seo = await collectSeoSnapshot(adapter, navResult.finalUrl, rawSeoMeta, networkPolicy);
   const { checks: linkChecks, meta: linkCheckMeta } = await collectLinkChecks(
     adapter,
     elements,
     navResult.finalUrl,
-    options
+    options,
+    networkPolicy
   );
   const focusIndicatorChecks = await collectFocusIndicatorChecks(adapter, elements, viewport);
   const hoverFeedbackChecks = await collectHoverFeedbackChecks(adapter, elements, viewport);
@@ -235,7 +238,7 @@ async function collectSeoSnapshot(
   adapter: BrowserAdapter,
   finalUrl: string,
   rawSeoMeta: any,
-  options: CollectPageContextOptions
+  networkPolicy: ScannerNetworkPolicy
 ): Promise<SeoSnapshot> {
   const seo: SeoSnapshot = {
     metaDescription: rawSeoMeta.metaDescription,
@@ -247,7 +250,7 @@ async function collectSeoSnapshot(
 
   try {
     const robotsUrl = new URL("/robots.txt", finalUrl).toString();
-    if (!options.skipUrlGuardForBenchmarkFixturesOnly) await assertUrlIsSafe(robotsUrl);
+    await networkPolicy.assertAllowed(robotsUrl);
     const result = await adapter.fetchExternal(robotsUrl);
     seo.robotsTxt.checked = true;
     seo.robotsTxt.accessible = result.ok;
@@ -261,7 +264,7 @@ async function collectSeoSnapshot(
       const firstSitemap = parsed.sitemapUrls[0];
       if (firstSitemap) {
         try {
-          if (!options.skipUrlGuardForBenchmarkFixturesOnly) await assertUrlIsSafe(firstSitemap);
+          await networkPolicy.assertAllowed(firstSitemap);
           const sitemapResult = await adapter.fetchExternal(firstSitemap);
           seo.sitemap = { url: firstSitemap, accessible: sitemapResult.ok, statusCode: sitemapResult.status };
         } catch {
@@ -339,7 +342,8 @@ async function collectLinkChecks(
   adapter: BrowserAdapter,
   elements: ElementSnapshot[],
   finalUrl: string,
-  options: CollectPageContextOptions
+  options: CollectPageContextOptions,
+  networkPolicy: ScannerNetworkPolicy
 ): Promise<{ checks: LinkCheck[]; meta: LinkCheckMeta }> {
   const maxLinksToCheck = options.linkCheck?.maxLinksToCheck ?? DEFAULT_MAX_LINKS_TO_CHECK;
   const scope = options.linkCheck?.scope ?? "all";
@@ -379,7 +383,7 @@ async function collectLinkChecks(
   const results = await Promise.all(
     Array.from(uniqueUrls).map(async (url): Promise<LinkCheck | null> => {
       try {
-        if (!options.skipUrlGuardForBenchmarkFixturesOnly) await assertUrlIsSafe(url);
+        await networkPolicy.assertAllowed(url);
       } catch {
         return null;
       }

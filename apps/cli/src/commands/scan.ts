@@ -5,7 +5,7 @@ import { resolveViewports, Viewport, UiIssue } from "@ui-quality/shared";
 import {
   PlaywrightBrowserAdapter,
   collectPageContext,
-  UrlSecurityError,
+  ScannerNetworkPolicyError,
 } from "@ui-quality/scanner-core";
 import { DetectorRegistry } from "@ui-quality/detectors";
 import {
@@ -136,7 +136,7 @@ export async function runScanCommand(options: ScanCommandOptions): Promise<{
       allIssues.push(...issues);
     } catch (err) {
       anyViewportFailed = true;
-      if (err instanceof UrlSecurityError) {
+      if (err instanceof ScannerNetworkPolicyError) {
         // Fail the whole scan immediately on a security rejection —
         // there is no partial-credit for scanning an unsafe URL.
         throw err;

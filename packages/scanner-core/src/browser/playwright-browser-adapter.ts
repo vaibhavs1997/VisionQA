@@ -9,7 +9,8 @@ import {
 } from "playwright";
 import { Viewport, NetworkResource, ConsoleMessage, ScreenshotAsset } from "@ui-quality/shared";
 import { BrowserAdapter, NavigateResult, RawElementData } from "./browser-adapter";
-import { assertUrlIsSafe, assertRedirectCountAllowed } from "../security/url-security-guard";
+import { assertRedirectCountAllowed } from "../security/url-security-guard";
+import { ScannerNetworkPolicy } from "../security/scanner-network-policy";
 import { collectPageDataInBrowser } from "../collector/browser-scripts";
 
 export interface PlaywrightAdapterOptions {
@@ -24,6 +25,7 @@ export interface PlaywrightAdapterOptions {
    * another mechanism. Defaults to Playwright's own managed browser.
    */
   executablePath?: string;
+  networkPolicy?: ScannerNetworkPolicy;
 }
 
 /**
@@ -42,6 +44,7 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
   private resources: NetworkResource[] = [];
   private consoleMessages: ConsoleMessage[] = [];
   private readonly options: Required<PlaywrightAdapterOptions>;
+  private readonly networkPolicy: ScannerNetworkPolicy;
 
   constructor(options: PlaywrightAdapterOptions = {}) {
     this.options = {
@@ -49,7 +52,9 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
       maxRedirects: options.maxRedirects ?? 10,
       maxResponseBytes: options.maxResponseBytes ?? 25 * 1024 * 1024, // 25MB
       executablePath: options.executablePath ?? process.env.UI_SCAN_CHROMIUM_PATH ?? "",
+      networkPolicy: options.networkPolicy ?? new ScannerNetworkPolicy(),
     };
+    this.networkPolicy = this.options.networkPolicy;
   }
 
   async open(): Promise<void> {
@@ -111,7 +116,7 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
           });
           if (location) {
             const resolved = new URL(location, response.url());
-            await assertUrlIsSafe(resolved.toString());
+            await this.networkPolicy.assertAllowed(resolved.toString());
           }
         }
 
@@ -226,18 +231,29 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
   async fetchExternal(url: string, timeoutMs = 5000): Promise<import("./browser-adapter").ExternalFetchResult> {
     if (!this.context) return { ok: false, error: "adapter not open" };
     try {
-      const response = await this.context.request.get(url, {
-        timeout: timeoutMs,
-        maxRedirects: 5,
-        failOnStatusCode: false,
-      });
-      const status = response.status();
-      // robots.txt/sitemap files are always small; cap defensively so a
-      // misconfigured server returning something enormous at this path
-      // can't blow up memory the way an uncapped page response could.
-      const buffer = await response.body();
-      const body = buffer.slice(0, 200_000).toString("utf-8");
-      return { ok: status >= 200 && status < 400, status, body };
+      let currentUrl = url;
+      for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+        await this.networkPolicy.assertAllowed(currentUrl);
+        const response = await this.context.request.get(currentUrl, {
+          timeout: timeoutMs,
+          maxRedirects: 0,
+          failOnStatusCode: false,
+        });
+        const status = response.status();
+        const location = response.headers()["location"];
+        if (status >= 300 && status < 400 && location) {
+          if (redirectCount === 5) return { ok: false, status, error: "redirect limit exceeded" };
+          currentUrl = new URL(location, currentUrl).toString();
+          continue;
+        }
+        // robots.txt/sitemap files are always small; cap defensively so a
+        // misconfigured server returning something enormous at this path
+        // can't blow up memory the way an uncapped page response could.
+        const buffer = await response.body();
+        const body = buffer.slice(0, 200_000).toString("utf-8");
+        return { ok: status >= 200 && status < 400, status, body };
+      }
+      return { ok: false, error: "redirect limit exceeded" };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : "fetch failed" };
     }
