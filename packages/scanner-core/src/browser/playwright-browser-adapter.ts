@@ -9,8 +9,10 @@ import {
 } from "playwright";
 import { Viewport, NetworkResource, ConsoleMessage, ScreenshotAsset } from "@ui-quality/shared";
 import { BrowserAdapter, NavigateResult, RawElementData } from "./browser-adapter";
-import { assertUrlIsSafe, assertRedirectCountAllowed } from "../security/url-security-guard";
+import { assertRedirectCountAllowed } from "../security/url-security-guard";
+import { ScannerNetworkPolicy, ScannerNetworkPolicyError } from "../security/scanner-network-policy";
 import { collectPageDataInBrowser } from "../collector/browser-scripts";
+import { createScannerRequestInterception } from "./scanner-request-interception";
 
 export interface PlaywrightAdapterOptions {
   navigationTimeoutMs?: number;
@@ -24,6 +26,7 @@ export interface PlaywrightAdapterOptions {
    * another mechanism. Defaults to Playwright's own managed browser.
    */
   executablePath?: string;
+  networkPolicy?: ScannerNetworkPolicy;
 }
 
 /**
@@ -41,7 +44,10 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
   private redirectChain: string[] = [];
   private resources: NetworkResource[] = [];
   private consoleMessages: ConsoleMessage[] = [];
+  private blockedRequestUrls = new Set<string>();
+  private blockedMainFrameNavigationError: ScannerNetworkPolicyError | null = null;
   private readonly options: Required<PlaywrightAdapterOptions>;
+  private readonly networkPolicy: ScannerNetworkPolicy;
 
   constructor(options: PlaywrightAdapterOptions = {}) {
     this.options = {
@@ -49,7 +55,9 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
       maxRedirects: options.maxRedirects ?? 10,
       maxResponseBytes: options.maxResponseBytes ?? 25 * 1024 * 1024, // 25MB
       executablePath: options.executablePath ?? process.env.UI_SCAN_CHROMIUM_PATH ?? "",
+      networkPolicy: options.networkPolicy ?? new ScannerNetworkPolicy(),
     };
+    this.networkPolicy = this.options.networkPolicy;
   }
 
   async open(): Promise<void> {
@@ -67,9 +75,34 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
       acceptDownloads: false,
       permissions: [],
       javaScriptEnabled: true,
+      // Playwright routing cannot observe requests fulfilled by a service
+      // worker. Blocking service workers avoids that SSRF bypass path.
+      serviceWorkers: "block",
       bypassCSP: false,
       ignoreHTTPSErrors: false,
     });
+
+    // Context-level routing is deliberately installed before creating a page.
+    // It covers every request emitted by every frame in this context, rather
+    // than only validating the caller-provided page.goto() destination.
+    await this.context.route(
+      "**/*",
+      createScannerRequestInterception(this.networkPolicy, {
+        onBlockedRequest: (request, error) => {
+          this.blockedRequestUrls.add(request.url());
+          this.resources.push({
+            url: request.url(),
+            method: request.method(),
+            resourceType: request.resourceType(),
+            ok: false,
+            failureText: error.code,
+          });
+          if (request.isNavigationRequest() && request.frame?.() === this.page?.mainFrame()) {
+            this.blockedMainFrameNavigationError = error;
+          }
+        },
+      })
+    );
 
     // Block downloads outright as a second layer of defense.
     this.context.on("page", (p) => {
@@ -111,7 +144,7 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
           });
           if (location) {
             const resolved = new URL(location, response.url());
-            await assertUrlIsSafe(resolved.toString());
+            await this.networkPolicy.assertAllowed(resolved.toString());
           }
         }
 
@@ -126,10 +159,18 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
       } catch (err) {
         // Security guard rejection on a redirect surfaces here; store it
         // as a failed resource rather than throwing out of an event handler.
+        const request = response.request();
+        if (
+          err instanceof ScannerNetworkPolicyError &&
+          request.isNavigationRequest() &&
+          request.frame() === this.page?.mainFrame()
+        ) {
+          this.blockedMainFrameNavigationError = err;
+        }
         this.resources.push({
           url: response.url(),
-          method: response.request().method(),
-          resourceType: response.request().resourceType(),
+          method: request.method(),
+          resourceType: request.resourceType(),
           ok: false,
           failureText: err instanceof Error ? err.message : "blocked by security guard",
         });
@@ -137,6 +178,7 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
     });
 
     this.page.on("requestfailed", (request) => {
+      if (this.blockedRequestUrls.has(request.url())) return;
       this.resources.push({
         url: request.url(),
         method: request.method(),
@@ -152,6 +194,8 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
 
     this.redirectCount = 0;
     this.redirectChain = [url];
+    this.blockedRequestUrls.clear();
+    this.blockedMainFrameNavigationError = null;
 
     await this.page.setViewportSize({ width: viewport.width, height: viewport.height });
 
@@ -176,8 +220,11 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
       // Settle window for animations/transitions before screenshots.
       await this.page.waitForTimeout(400);
     } catch (err) {
+      if (this.blockedMainFrameNavigationError) throw this.blockedMainFrameNavigationError;
       loadState = "timeout";
     }
+
+    if (this.blockedMainFrameNavigationError) throw this.blockedMainFrameNavigationError;
 
     const finalUrl = this.page.url();
     if (this.redirectChain[this.redirectChain.length - 1] !== finalUrl) {
@@ -226,18 +273,29 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
   async fetchExternal(url: string, timeoutMs = 5000): Promise<import("./browser-adapter").ExternalFetchResult> {
     if (!this.context) return { ok: false, error: "adapter not open" };
     try {
-      const response = await this.context.request.get(url, {
-        timeout: timeoutMs,
-        maxRedirects: 5,
-        failOnStatusCode: false,
-      });
-      const status = response.status();
-      // robots.txt/sitemap files are always small; cap defensively so a
-      // misconfigured server returning something enormous at this path
-      // can't blow up memory the way an uncapped page response could.
-      const buffer = await response.body();
-      const body = buffer.slice(0, 200_000).toString("utf-8");
-      return { ok: status >= 200 && status < 400, status, body };
+      let currentUrl = url;
+      for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
+        await this.networkPolicy.assertAllowed(currentUrl);
+        const response = await this.context.request.get(currentUrl, {
+          timeout: timeoutMs,
+          maxRedirects: 0,
+          failOnStatusCode: false,
+        });
+        const status = response.status();
+        const location = response.headers()["location"];
+        if (status >= 300 && status < 400 && location) {
+          if (redirectCount === 5) return { ok: false, status, error: "redirect limit exceeded" };
+          currentUrl = new URL(location, currentUrl).toString();
+          continue;
+        }
+        // robots.txt/sitemap files are always small; cap defensively so a
+        // misconfigured server returning something enormous at this path
+        // can't blow up memory the way an uncapped page response could.
+        const buffer = await response.body();
+        const body = buffer.slice(0, 200_000).toString("utf-8");
+        return { ok: status >= 200 && status < 400, status, body };
+      }
+      return { ok: false, error: "redirect limit exceeded" };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : "fetch failed" };
     }

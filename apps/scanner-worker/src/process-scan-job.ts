@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { Pool } from "pg";
 import { resolveViewports, Viewport, UiIssue, parseProjectSettings, ScanInsights, CrawlMode } from "@ui-quality/shared";
-import { PlaywrightBrowserAdapter, collectPageContext, assertUrlIsSafe } from "@ui-quality/scanner-core";
+import { PlaywrightBrowserAdapter, collectPageContext, ScannerNetworkPolicy } from "@ui-quality/scanner-core";
 import { DetectorRegistry, OPTIONAL_DETECTORS } from "@ui-quality/detectors";
 import { discoverUrls } from "@ui-quality/crawler";
 import {
@@ -107,6 +107,7 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
   const { scanId } = payload;
   const viewports: Viewport[] = resolveViewports(payload.viewports);
   const projectSettings = parseProjectSettings(payload.projectSettings);
+  const networkPolicy = new ScannerNetworkPolicy();
   const crawlMode: CrawlMode = payload.crawlMode ?? projectSettings.defaultCrawlMode;
   const maxPages = payload.maxPages ?? projectSettings.defaultMaxPages;
   const registry = new DetectorRegistry().withOptional(projectSettings.runAxe ? OPTIONAL_DETECTORS : []);
@@ -127,7 +128,7 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
 
   await updateScanProgress(pool, scanId, { status: "INITIALIZING" });
 
-  const discoverAdapter = new PlaywrightBrowserAdapter({ executablePath: deps.chromiumExecutablePath });
+  const discoverAdapter = new PlaywrightBrowserAdapter({ executablePath: deps.chromiumExecutablePath, networkPolicy });
   let pageUrls = [payload.requestedUrl];
   try {
     await discoverAdapter.open();
@@ -137,7 +138,7 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
       maxPages,
       fetchText: async (url) => {
         try {
-          await assertUrlIsSafe(url);
+          await networkPolicy.assertAllowed(url);
         } catch {
           return { ok: false };
         }
@@ -160,7 +161,7 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
     let pagesCompleted = 0;
     for (const pageUrl of pageUrls) {
       for (const viewport of viewports) {
-      const adapter = new PlaywrightBrowserAdapter({ executablePath: deps.chromiumExecutablePath });
+      const adapter = new PlaywrightBrowserAdapter({ executablePath: deps.chromiumExecutablePath, networkPolicy });
       const viewportOutDir = path.join(tempDir, viewport.name);
 
       try {
@@ -176,6 +177,7 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
             scope: projectSettings.linkCheckScope,
           },
           runAxe: projectSettings.runAxe,
+          networkPolicy,
         });
         finalUrl = pageContext.page.finalUrl;
         if (viewport.name === "desktop" && pageUrl === pageUrls[0]) {

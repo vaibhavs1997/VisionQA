@@ -4,7 +4,7 @@ import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { VIEWPORT_PRESETS } from "@ui-quality/shared";
-import { PlaywrightBrowserAdapter, collectPageContext } from "@ui-quality/scanner-core";
+import { PlaywrightBrowserAdapter, collectPageContext, ScannerNetworkPolicy } from "@ui-quality/scanner-core";
 import { DetectorRegistry } from "@ui-quality/detectors";
 import { validateCandidates, deduplicateCandidates } from "@ui-quality/issue-engine";
 
@@ -63,8 +63,10 @@ async function scanFixture(
   const started = Date.now();
 
   for (const viewport of [VIEWPORT_PRESETS.desktop, VIEWPORT_PRESETS.mobile]) {
+    const networkPolicy = ScannerNetworkPolicy.forTestFixtures();
     const adapter = new PlaywrightBrowserAdapter({
       executablePath: process.env.UI_SCAN_CHROMIUM_PATH,
+      networkPolicy,
     });
     try {
       const outDir = path.join(OUT_DIR, fixtureFile.replace(".html", ""), viewport.name);
@@ -73,7 +75,7 @@ async function scanFixture(
         requestedUrl: url,
         viewport,
         outDir,
-        skipUrlGuardForBenchmarkFixturesOnly: true,
+        networkPolicy,
       });
 
       const candidates = await registry.runAll(pageContext);

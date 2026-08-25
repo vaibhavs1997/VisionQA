@@ -2,7 +2,7 @@
 import { Command } from "commander";
 import { runScanCommand } from "./commands/scan";
 import { printConsoleSummary } from "./formatters/console-summary";
-import { UrlSecurityError } from "@ui-quality/scanner-core";
+import { ScannerNetworkPolicyError } from "@ui-quality/scanner-core";
 
 const program = new Command();
 
@@ -50,7 +50,7 @@ program
       // detected UI issues — per the Phase 0 spec for CLI Scan Command.
       process.exit(0);
     } catch (err) {
-      if (err instanceof UrlSecurityError) {
+      if (err instanceof ScannerNetworkPolicyError) {
         console.error(`\nScan rejected by URL Security Guard: ${err.message}\nReason: ${err.reason}\n`);
       } else {
         console.error(`\nScan failed: ${err instanceof Error ? err.message : err}\n`);

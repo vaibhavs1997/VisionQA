@@ -44,7 +44,7 @@ describe("assertUrlIsSafe", () => {
       expect.fail("should have thrown");
     } catch (err) {
       expect(err).toBeInstanceOf(UrlSecurityError);
-      expect((err as UrlSecurityError).reason).toBe("private-address");
+      expect((err as UrlSecurityError).reason).toBe("UNSAFE_ADDRESS");
     }
   });
 });
