@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { api } from "@/lib/api-client";
-import { ScorePanel } from "@/components/score-panel";
-import { IssueCard } from "@/components/issue-card";
-import { IssueFilterBar } from "@/components/issue-filter-bar";
-import { ScanProgressPoller } from "@/components/scan-progress-poller";
-import { ScreenshotViewer } from "@/components/screenshot-viewer";
-import { ScanInsightsPanel } from "@/components/scan-insights-panel";
+import { ScorePanel } from "@/components/scans/score-panel";
+import { IssueCard } from "@/components/issues/issue-card";
+import { IssueFilterBar } from "@/components/issues/issue-filter-bar";
+import { ScanProgressPoller } from "@/components/scans/scan-progress-poller";
+import { ScreenshotViewer } from "@/components/scans/screenshot-viewer";
+import { ScanInsightsPanel } from "@/components/scans/scan-insights-panel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 

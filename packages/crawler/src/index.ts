@@ -1,11 +1,14 @@
 import { CrawlMode, DEFAULT_MAX_CRAWL_PAGES, MAX_CRAWL_PAGES_HARD_CAP } from "@ui-quality/shared";
+import { ScannerNetworkPolicy } from "@ui-quality/scanner-core";
 
 export interface DiscoverUrlsOptions {
   mode: CrawlMode;
   entryUrl: string;
   maxPages: number;
-  /** Fetch robots/sitemap HTML (already security-checked by caller). */
+  /** Fetches text only after the crawler's policy validation succeeds. */
   fetchText: (url: string, timeoutMs?: number) => Promise<{ ok: boolean; body?: string; status?: number }>;
+  /** Required for every discovered scanner-controlled HTTP(S) target. */
+  networkPolicy: ScannerNetworkPolicy;
 }
 
 function normalizeUrl(url: string, base: string): string | null {
@@ -56,7 +59,21 @@ export async function discoverUrls(options: DiscoverUrlsOptions): Promise<string
   const maxPages = Math.min(MAX_CRAWL_PAGES_HARD_CAP, Math.max(1, options.maxPages || DEFAULT_MAX_CRAWL_PAGES));
   const entry = normalizeUrl(options.entryUrl, options.entryUrl);
   if (!entry) return [];
+  try {
+    await options.networkPolicy.assertAllowed(entry);
+  } catch {
+    return [];
+  }
   if (options.mode === "single") return [entry];
+
+  const fetchSafe = async (url: string) => {
+    try {
+      await options.networkPolicy.assertAllowed(url);
+      return await options.fetchText(url);
+    } catch {
+      return { ok: false };
+    }
+  };
 
   const seen = new Set<string>();
   const queue: string[] = [entry];
@@ -64,7 +81,7 @@ export async function discoverUrls(options: DiscoverUrlsOptions): Promise<string
 
   if (options.mode === "sitemap") {
     const origin = new URL(entry).origin;
-    const robots = await options.fetchText(`${origin}/robots.txt`);
+    const robots = await fetchSafe(`${origin}/robots.txt`);
     let sitemapUrls: string[] = [];
     if (robots.ok && robots.body) {
       for (const line of robots.body.split("\n")) {
@@ -75,12 +92,28 @@ export async function discoverUrls(options: DiscoverUrlsOptions): Promise<string
     if (sitemapUrls.length === 0) {
       sitemapUrls = [`${origin}/sitemap.xml`];
     }
-    for (const sm of sitemapUrls) {
-      const res = await options.fetchText(sm);
+    const sitemapQueue = [...sitemapUrls];
+    const seenSitemaps = new Set<string>();
+    while (sitemapQueue.length > 0 && out.length < maxPages) {
+      const sm = sitemapQueue.shift()!;
+      if (seenSitemaps.has(sm)) continue;
+      seenSitemaps.add(sm);
+      const res = await fetchSafe(sm);
       if (!res.ok || !res.body) continue;
+      const isSitemapIndex = /<sitemapindex(?:\s|>)/i.test(res.body);
       for (const loc of parseSitemapLocs(res.body)) {
         const n = normalizeUrl(loc, sm);
-        if (!n || !sameOrigin(n, entry)) continue;
+        if (!n) continue;
+        try {
+          await options.networkPolicy.assertAllowed(n);
+        } catch {
+          continue;
+        }
+        if (!sameOrigin(n, entry)) continue;
+        if (isSitemapIndex) {
+          if (!seenSitemaps.has(n)) sitemapQueue.push(n);
+          continue;
+        }
         if (!seen.has(n)) {
           seen.add(n);
           out.push(n);
@@ -98,10 +131,15 @@ export async function discoverUrls(options: DiscoverUrlsOptions): Promise<string
     seen.add(current);
     out.push(current);
 
-    const page = await options.fetchText(current);
+    const page = await fetchSafe(current);
     if (!page.ok || !page.body) continue;
 
     for (const href of parseAnchorHrefs(page.body, current)) {
+      try {
+        await options.networkPolicy.assertAllowed(href);
+      } catch {
+        continue;
+      }
       if (!sameOrigin(href, entry)) continue;
       if (!seen.has(href) && !queue.includes(href)) queue.push(href);
     }

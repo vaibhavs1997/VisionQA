@@ -14,6 +14,13 @@ export class ScannerNetworkPolicyError extends Error {
 }
 
 export type DnsLookup = (hostname: string) => Promise<dns.LookupAddress[]>;
+export interface ResolvedScannerDestination {
+  /** Original HTTP(S) URL; its hostname is retained for Host and TLS SNI. */
+  url: URL;
+  hostname: string;
+  /** Addresses approved for this one connection lifecycle. */
+  addresses: readonly dns.LookupAddress[];
+}
 export interface ScannerNetworkPolicyOptions {
   dnsLookup?: DnsLookup;
   /** Test/benchmark-only: permits loopback only, never other unsafe ranges. */
@@ -89,25 +96,49 @@ export class ScannerNetworkPolicy {
   static forTestFixtures(options: Omit<ScannerNetworkPolicyOptions, "allowLoopbackForTestFixtures"> = {}): ScannerNetworkPolicy {
     return new ScannerNetworkPolicy({ ...options, allowLoopbackForTestFixtures: true });
   }
-  async assertAllowed(rawUrl: string): Promise<URL> {
+  /**
+   * Resolves and validates a destination once. Node HTTP clients must use
+   * the returned addresses directly rather than resolving the hostname again.
+   */
+  async resolveHttpDestination(rawUrl: string): Promise<ResolvedScannerDestination> {
     let url: URL;
     try { url = new URL(rawUrl); } catch { throw new ScannerNetworkPolicyError("INVALID_URL"); }
     if (url.protocol !== "http:" && url.protocol !== "https:") throw new ScannerNetworkPolicyError("UNSUPPORTED_PROTOCOL");
     const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
     if (hostname === "localhost" || hostname.endsWith(".localhost")) {
-      if (this.allowLoopbackForTestFixtures) return url;
+      if (this.allowLoopbackForTestFixtures) {
+        return { url, hostname, addresses: [{ address: hostname === "localhost" ? "127.0.0.1" : "::1", family: hostname === "localhost" ? 4 : 6 }] };
+      }
       throw new ScannerNetworkPolicyError("UNSAFE_ADDRESS");
     }
     if (net.isIP(hostname)) {
-      if (this.allowLoopbackForTestFixtures && (hostname.startsWith("127.") || hostname === "::1")) return url;
+      if (this.allowLoopbackForTestFixtures && (hostname.startsWith("127.") || hostname === "::1")) {
+        return { url, hostname, addresses: [{ address: hostname, family: net.isIPv6(hostname) ? 6 : 4 }] };
+      }
       if (isUnsafeScannerAddress(hostname)) throw new ScannerNetworkPolicyError("UNSAFE_ADDRESS");
-      return url;
+      return { url, hostname, addresses: [{ address: hostname, family: net.isIPv6(hostname) ? 6 : 4 }] };
     }
     let addresses: dns.LookupAddress[];
     try { addresses = await this.dnsLookup(hostname); } catch { throw new ScannerNetworkPolicyError("DNS_RESOLUTION_FAILED"); }
     if (addresses.length === 0 || addresses.some(({ address }) => isUnsafeScannerAddress(address))) {
       throw new ScannerNetworkPolicyError("UNSAFE_ADDRESS");
     }
+    return { url, hostname, addresses: addresses.map(({ address, family }) => ({ address, family })) };
+  }
+  async assertAllowed(rawUrl: string): Promise<URL> {
+    return (await this.resolveHttpDestination(rawUrl)).url;
+  }
+
+  /** Validates a WebSocket destination with the same host-address rules as HTTP(S). */
+  async assertWebSocketAllowed(rawUrl: string): Promise<URL> {
+    let url: URL;
+    try { url = new URL(rawUrl); } catch { throw new ScannerNetworkPolicyError("INVALID_URL"); }
+    if (url.protocol !== "ws:" && url.protocol !== "wss:") {
+      throw new ScannerNetworkPolicyError("UNSUPPORTED_PROTOCOL");
+    }
+    const equivalentHttpUrl = new URL(url.toString());
+    equivalentHttpUrl.protocol = url.protocol === "ws:" ? "http:" : "https:";
+    await this.resolveHttpDestination(equivalentHttpUrl.toString());
     return url;
   }
 }

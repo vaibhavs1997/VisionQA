@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createScannerRequestInterception,
+  createScannerWebSocketInterception,
   InterceptedBrowserRequest,
 } from "../browser/scanner-request-interception";
 import { ScannerNetworkPolicy } from "../security/scanner-network-policy";
@@ -66,5 +67,31 @@ describe("scanner request interception", () => {
       expect(calls.continued).toBe(1);
       expect(calls.aborted).toBe(0);
     }
+  });
+
+  it("blocks a private WebSocket before it connects", async () => {
+    const blocked: string[] = [];
+    const handler = createScannerWebSocketInterception(publicPolicy, { onBlockedWebSocket: (url) => blocked.push(url) });
+    let connected = 0;
+    let closed = 0;
+    await handler({
+      url: () => "ws://127.0.0.1/internal",
+      connectToServer: () => { connected += 1; },
+      close: async () => { closed += 1; },
+    });
+    expect(connected).toBe(0);
+    expect(closed).toBe(1);
+    expect(blocked).toEqual(["ws://127.0.0.1/internal"]);
+  });
+
+  it("allows a legitimate public WebSocket connection", async () => {
+    const handler = createScannerWebSocketInterception(publicPolicy, { onBlockedWebSocket: () => { throw new Error("public WebSocket was blocked"); } });
+    let connected = 0;
+    await handler({
+      url: () => "wss://public.example/socket",
+      connectToServer: () => { connected += 1; },
+      close: async () => { throw new Error("should not close"); },
+    });
+    expect(connected).toBe(1);
   });
 });

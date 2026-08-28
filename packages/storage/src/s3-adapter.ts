@@ -25,7 +25,7 @@ export interface S3ObjectStorageOptions {
  * codebase actually instantiates yet).
  */
 export class S3ObjectStorage implements ObjectStorage {
-  constructor(private readonly options: S3ObjectStorageOptions) {
+  constructor(_options: S3ObjectStorageOptions) {
     throw new Error(
       "S3ObjectStorage is a documented stub, not wired up in this environment (no AWS credentials/bucket " +
         "available to verify against). See this file's module comment for what's needed to activate it."

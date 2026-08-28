@@ -28,10 +28,10 @@ import {
 } from "@ui-quality/database";
 import { ScanJobPayload, ScanJobResult } from "@ui-quality/queue";
 
-function resolveAiProvider(mode: "off" | "mock" | "anthropic"): AiProvider | null {
+function resolveAiProvider(mode: "off" | "mock" | "anthropic", networkPolicy: ScannerNetworkPolicy): AiProvider | null {
   if (mode === "off") return null;
   if (mode === "mock") return new MockAiProvider();
-  return new AnthropicProvider();
+  return new AnthropicProvider({ networkPolicy });
 }
 
 /**
@@ -111,7 +111,7 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
   const crawlMode: CrawlMode = payload.crawlMode ?? projectSettings.defaultCrawlMode;
   const maxPages = payload.maxPages ?? projectSettings.defaultMaxPages;
   const registry = new DetectorRegistry().withOptional(projectSettings.runAxe ? OPTIONAL_DETECTORS : []);
-  const aiProvider = resolveAiProvider(payload.aiMode);
+  const aiProvider = resolveAiProvider(payload.aiMode, networkPolicy);
   const aiCostTracker = new AiCostTracker();
   const startedAtMs = Date.now();
 
@@ -136,12 +136,8 @@ export async function processScanJob(payload: ScanJobPayload, deps: ProcessScanJ
       mode: crawlMode,
       entryUrl: payload.requestedUrl,
       maxPages,
+      networkPolicy,
       fetchText: async (url) => {
-        try {
-          await networkPolicy.assertAllowed(url);
-        } catch {
-          return { ok: false };
-        }
         const res = await discoverAdapter.fetchExternal(url);
         return { ok: res.ok, body: res.body, status: res.status };
       },

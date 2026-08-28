@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { api } from "@/lib/api-client";
-import { CreateProjectForm } from "@/components/create-project-form";
+import { CreateProjectForm } from "@/components/projects/create-project-form";
 
 export default async function WorkspaceDashboardPage({ params }: { params: { workspaceId: string } }) {
   const { projects } = await api.listProjects(params.workspaceId);

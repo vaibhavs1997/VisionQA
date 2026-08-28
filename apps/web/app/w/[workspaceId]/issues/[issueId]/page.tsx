@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { api } from "@/lib/api-client";
-import { ScreenshotViewer } from "@/components/screenshot-viewer";
-import { FeedbackButtons } from "@/components/feedback-buttons";
-import { IssueCard } from "@/components/issue-card";
+import { ScreenshotViewer } from "@/components/scans/screenshot-viewer";
+import { FeedbackButtons } from "@/components/issues/feedback-buttons";
+import { IssueCard } from "@/components/issues/issue-card";
 import { SeverityBadge, Badge } from "@/components/ui/badge";
 
 export default async function IssueDetailPage({ params }: { params: { workspaceId: string; issueId: string } }) {

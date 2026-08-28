@@ -4,7 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import sharp from "sharp";
 import { enhanceWithAi } from "../ai-service";
-import { MockAiProvider } from "../provider/mock-provider";
+import { MockAiProvider } from "../providers/mock-provider";
 import { AiCostTracker } from "../cost-tracker";
 import { PageContext, IssueCandidate, ElementSnapshot } from "@ui-quality/shared";
 
@@ -57,7 +57,7 @@ function makeElement(overrides: Partial<ElementSnapshot>): ElementSnapshot {
   };
 }
 
-function makePageContext(elements: ElementSnapshot[], screenshotPath: string): PageContext {
+function makePageContext(elements: ElementSnapshot[]): PageContext {
   return {
     scan: {
       scanId: "scan_test",
@@ -107,7 +107,7 @@ describe("enhanceWithAi", () => {
   it("passes through ineligible issue types completely untouched", async () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "img.hero" });
-    const context = makePageContext([elA], screenshotPath);
+    const context = makePageContext([elA]);
     const candidate = makeCandidate({
       issueType: "broken-image-network-error",
       category: "image",
@@ -130,7 +130,7 @@ describe("enhanceWithAi", () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "button.a", boundingBox: { x: 10, y: 10, width: 100, height: 40 } });
     const elB = makeElement({ id: "el_b", selector: "button.b", boundingBox: { x: 60, y: 15, width: 100, height: 40 } });
-    const context = makePageContext([elA, elB], screenshotPath);
+    const context = makePageContext([elA, elB]);
 
     const candidate = makeCandidate({
       element: { selector: "button.a", boundingBox: elA.boundingBox! },
@@ -160,7 +160,7 @@ describe("enhanceWithAi", () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "button.a" });
     const elB = makeElement({ id: "el_b", selector: "button.b", boundingBox: { x: 500, y: 500, width: 50, height: 20 } });
-    const context = makePageContext([elA, elB], screenshotPath);
+    const context = makePageContext([elA, elB]);
 
     const candidate = makeCandidate({
       element: { selector: "button.a", boundingBox: elA.boundingBox! },
@@ -183,7 +183,7 @@ describe("enhanceWithAi", () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "button.a" });
     const elB = makeElement({ id: "el_b", selector: "button.b", boundingBox: { x: 55, y: 15, width: 100, height: 40 } });
-    const context = makePageContext([elA, elB], screenshotPath);
+    const context = makePageContext([elA, elB]);
 
     const candidate = makeCandidate({
       confidence: 0.6,
@@ -206,7 +206,7 @@ describe("enhanceWithAi", () => {
 
   it("leaves the candidate unchanged when no bounding box is available to build a request from", async () => {
     const screenshotPath = await makeScreenshot();
-    const context = makePageContext([], screenshotPath);
+    const context = makePageContext([]);
     const candidate = makeCandidate({ element: undefined });
 
     const tracker = new AiCostTracker();
@@ -224,7 +224,7 @@ describe("enhanceWithAi", () => {
   it("treats unexpected-disabled-cta and low-confidence broken-svg-icon as AI-eligible", async () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "button.checkout" });
-    const context = makePageContext([elA], screenshotPath);
+    const context = makePageContext([elA]);
 
     const ctaCandidate = makeCandidate({
       issueType: "unexpected-disabled-cta",
@@ -248,7 +248,7 @@ describe("enhanceWithAi", () => {
   it("does NOT send a high-confidence broken-svg-icon candidate to AI (only the ambiguous low-confidence case is eligible)", async () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "svg.icon" });
-    const context = makePageContext([elA], screenshotPath);
+    const context = makePageContext([elA]);
 
     const candidate = makeCandidate({
       issueType: "broken-svg-icon",
@@ -272,7 +272,7 @@ describe("enhanceWithAi", () => {
   it("treats low-contrast-borderline as AI-eligible", async () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "p.subtitle" });
-    const context = makePageContext([elA], screenshotPath);
+    const context = makePageContext([elA]);
 
     const candidate = makeCandidate({
       issueType: "low-contrast-borderline",
@@ -297,7 +297,7 @@ describe("enhanceWithAi", () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "div.card", tagName: "div" });
     const elB = makeElement({ id: "el_b", selector: "h2.title", tagName: "h2" });
-    const context = makePageContext([elA, elB], screenshotPath);
+    const context = makePageContext([elA, elB]);
 
     const lowConfidenceCandidate = makeCandidate({
       issueType: "empty-component",
@@ -327,7 +327,7 @@ describe("enhanceWithAi", () => {
   it("treats placeholder-generic-token as AI-eligible", async () => {
     const screenshotPath = await makeScreenshot();
     const elA = makeElement({ selector: "p.copy", tagName: "p" });
-    const context = makePageContext([elA], screenshotPath);
+    const context = makePageContext([elA]);
 
     const candidate = makeCandidate({
       issueType: "placeholder-generic-token",

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { api } from "@/lib/api-client";
-import { LogoutButton } from "@/components/logout-button";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { BrandMark } from "@/components/ui/brand-mark";
 
 export default async function WorkspaceLayout({

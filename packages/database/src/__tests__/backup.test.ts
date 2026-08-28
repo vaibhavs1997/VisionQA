@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { LocalFilesystemObjectStorage } from "@ui-quality/storage";
-import { runBackup } from "../backup";
+import { runBackup } from "../maintenance/backup";
 
 let rootDir: string;
 let storage: LocalFilesystemObjectStorage;

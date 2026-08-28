@@ -12,7 +12,8 @@ import { BrowserAdapter, NavigateResult, RawElementData } from "./browser-adapte
 import { assertRedirectCountAllowed } from "../security/url-security-guard";
 import { ScannerNetworkPolicy, ScannerNetworkPolicyError } from "../security/scanner-network-policy";
 import { collectPageDataInBrowser } from "../collector/browser-scripts";
-import { createScannerRequestInterception } from "./scanner-request-interception";
+import { createScannerRequestInterception, createScannerWebSocketInterception } from "./scanner-request-interception";
+import { fetchExternalWithPolicy } from "./policy-external-fetch";
 
 export interface PlaywrightAdapterOptions {
   navigationTimeoutMs?: number;
@@ -85,6 +86,9 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
     // Context-level routing is deliberately installed before creating a page.
     // It covers every request emitted by every frame in this context, rather
     // than only validating the caller-provided page.goto() destination.
+    // Playwright cannot inject a pinned DNS lookup into Chromium while
+    // preserving normal TLS/SNI. Browser traffic is therefore revalidated
+    // at routing time and MUST also be constrained by worker egress rules.
     await this.context.route(
       "**/*",
       createScannerRequestInterception(this.networkPolicy, {
@@ -100,6 +104,25 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
           if (request.isNavigationRequest() && request.frame?.() === this.page?.mainFrame()) {
             this.blockedMainFrameNavigationError = error;
           }
+        },
+      })
+    );
+
+    // WebSockets do not pass through context.route(). Playwright's
+    // WebSocket router is installed before any page exists, so a rejected
+    // destination never establishes a network connection.
+    await this.context.routeWebSocket(
+      "**/*",
+      createScannerWebSocketInterception(this.networkPolicy, {
+        onBlockedWebSocket: (url, error) => {
+          this.blockedRequestUrls.add(url);
+          this.resources.push({
+            url,
+            method: "GET",
+            resourceType: "websocket",
+            ok: false,
+            failureText: error.code,
+          });
         },
       })
     );
@@ -272,33 +295,7 @@ export class PlaywrightBrowserAdapter implements BrowserAdapter {
 
   async fetchExternal(url: string, timeoutMs = 5000): Promise<import("./browser-adapter").ExternalFetchResult> {
     if (!this.context) return { ok: false, error: "adapter not open" };
-    try {
-      let currentUrl = url;
-      for (let redirectCount = 0; redirectCount <= 5; redirectCount += 1) {
-        await this.networkPolicy.assertAllowed(currentUrl);
-        const response = await this.context.request.get(currentUrl, {
-          timeout: timeoutMs,
-          maxRedirects: 0,
-          failOnStatusCode: false,
-        });
-        const status = response.status();
-        const location = response.headers()["location"];
-        if (status >= 300 && status < 400 && location) {
-          if (redirectCount === 5) return { ok: false, status, error: "redirect limit exceeded" };
-          currentUrl = new URL(location, currentUrl).toString();
-          continue;
-        }
-        // robots.txt/sitemap files are always small; cap defensively so a
-        // misconfigured server returning something enormous at this path
-        // can't blow up memory the way an uncapped page response could.
-        const buffer = await response.body();
-        const body = buffer.slice(0, 200_000).toString("utf-8");
-        return { ok: status >= 200 && status < 400, status, body };
-      }
-      return { ok: false, error: "redirect limit exceeded" };
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : "fetch failed" };
-    }
+    return fetchExternalWithPolicy(this.networkPolicy, url, timeoutMs);
   }
 
   async checkFocusIndicators(

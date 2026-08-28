@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { api } from "@/lib/api-client";
-import { ScanForm } from "@/components/scan-form";
+import { ScanForm } from "@/components/scans/scan-form";
 import { Badge } from "@/components/ui/badge";
-import { ProjectTrendsPanel } from "@/components/project-trends-panel";
+import { ProjectTrendsPanel } from "@/components/projects/project-trends-panel";
 
 const STATUS_TONE: Record<string, "signal" | "warning" | "neutral"> = {
   COMPLETED: "signal",

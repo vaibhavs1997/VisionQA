@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export function loadEnvFile(): void {
-  const envPath = path.resolve(__dirname, "..", ".env");
+  const envPath = path.resolve(__dirname, "..", "..", "..", ".env");
   if (!fs.existsSync(envPath)) return;
   const text = fs.readFileSync(envPath).toString("utf8").replace(/^\uFEFF/, "");
   for (const line of text.split(/\r?\n/)) {

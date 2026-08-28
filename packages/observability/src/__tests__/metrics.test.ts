@@ -46,7 +46,6 @@ describe("createMetricsRegistry", () => {
     const b = createMetricsRegistry();
     a.scanJobsTotal.inc({ status: "COMPLETED" });
 
-    const bOutput = await b.registry.metrics();
     // b's registry should show the metric defined (zero-valued or absent
     // for that label) but must never reflect a's increment.
     const bValue = await b.scanJobsTotal.get();

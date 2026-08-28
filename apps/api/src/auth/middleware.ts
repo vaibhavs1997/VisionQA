@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from "fastify";
 import { Pool } from "pg";
 import { getUserById, getMembership, WorkspaceRole } from "@ui-quality/database";
 import { verifySessionToken } from "./session";
+import { getMongoUserById } from "./mongo-user-repository";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -37,6 +38,18 @@ export function requireAuth(pool: Pool) {
     if (!user) {
       return reply.code(401).send({ error: "unauthorized", message: "User no longer exists." });
     }
+    request.user = { id: user.id };
+  };
+}
+
+export function requireMongoAuth() {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const token = extractBearerToken(request);
+    if (!token) return reply.code(401).send({ error: "unauthorized", message: "Missing bearer token." });
+    const claims = verifySessionToken(token);
+    if (!claims) return reply.code(401).send({ error: "unauthorized", message: "Invalid or expired session." });
+    const user = await getMongoUserById(claims.userId);
+    if (!user || !user.isActive) return reply.code(401).send({ error: "unauthorized", message: "User no longer exists." });
     request.user = { id: user.id };
   };
 }

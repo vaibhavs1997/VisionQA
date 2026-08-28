@@ -7,7 +7,10 @@ export function registerErrorMessage(err: unknown): string {
     if (err.status === 429) return "Too many attempts. Please wait a minute and try again.";
   }
   if (err instanceof TypeError) {
-    return `Cannot reach the API at ${API_URL}. Start the API (apps/api, port 4000) and ensure PostgreSQL is running.`;
+    return `Cannot reach the API at ${API_URL}. Start the API in apps/api on port 4000.`;
+  }
+  if (err instanceof ApiError && err.status >= 500) {
+    return "The account service could not reach MongoDB. Check the MongoDB connection string and Atlas network access list.";
   }
   return "Something went wrong.";
 }
@@ -18,7 +21,10 @@ export function loginErrorMessage(err: unknown): string {
     if (err.status === 429) return "Too many attempts. Please wait a minute and try again.";
   }
   if (err instanceof TypeError) {
-    return `Cannot reach the API at ${API_URL}. Start the API (apps/api, port 4000) and ensure PostgreSQL is running.`;
+    return `Cannot reach the API at ${API_URL}. Start the API in apps/api on port 4000.`;
+  }
+  if (err instanceof ApiError && err.status >= 500) {
+    return "The account service could not reach MongoDB. Check the MongoDB connection string and Atlas network access list.";
   }
   return "Something went wrong.";
 }
