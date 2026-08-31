@@ -1,10 +1,10 @@
-import { RegisterForm } from "@/components/register-form";
-import { AuthShell } from "@/components/ui/auth-shell";
+import { AuthSwitcher } from "@/components/auth/auth-switcher";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 export default function RegisterPage() {
   return (
     <AuthShell>
-      <RegisterForm />
+      <AuthSwitcher initialMode="register" />
     </AuthShell>
   );
 }

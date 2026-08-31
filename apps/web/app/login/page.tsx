@@ -1,10 +1,10 @@
-import { LoginForm } from "@/components/login-form";
-import { AuthShell } from "@/components/ui/auth-shell";
+import { AuthSwitcher } from "@/components/auth/auth-switcher";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 export default function LoginPage() {
   return (
     <AuthShell>
-      <LoginForm />
+      <AuthSwitcher initialMode="login" />
     </AuthShell>
   );
 }

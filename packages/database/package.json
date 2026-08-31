@@ -6,8 +6,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node -e \"const fs=require('fs');const p='dist/migrations';fs.mkdirSync(p,{recursive:true});for(const f of fs.readdirSync('migrations').filter(x=>x.endsWith('.sql'))) fs.copyFileSync('migrations/'+f,p+'/'+f);\"",
     "migrate": "tsx src/migrate.ts",
-    "backup": "tsx src/backup.ts",
-    "restore": "tsx src/restore.ts"
+    "backup": "tsx src/maintenance/backup.ts",
+    "restore": "tsx src/maintenance/restore.ts"
   },
   "dependencies": {
     "pg": "^8.13.0",

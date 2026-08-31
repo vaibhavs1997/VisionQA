@@ -1,4 +1,4 @@
-import { ScannerNetworkPolicy, ScannerNetworkPolicyError } from "../security/scanner-network-policy";
+import { NETWORK_DESTINATION_BLOCKED, ScannerNetworkPolicy, ScannerNetworkPolicyError } from "../security/scanner-network-policy";
 
 export interface InterceptedBrowserRequest {
   url(): string;
@@ -16,6 +16,16 @@ export interface InterceptedBrowserRoute {
 
 export interface ScannerRequestInterceptionHooks {
   onBlockedRequest(request: InterceptedBrowserRequest, error: ScannerNetworkPolicyError): void;
+}
+
+export interface InterceptedWebSocketRoute {
+  url(): string;
+  connectToServer(): unknown;
+  close(options?: { code?: number; reason?: string }): Promise<void>;
+}
+
+export interface ScannerWebSocketInterceptionHooks {
+  onBlockedWebSocket(url: string, error: ScannerNetworkPolicyError): void;
 }
 
 function protocolOf(rawUrl: string): string | null {
@@ -63,6 +73,29 @@ export function createScannerRequestInterception(
       // Aborting optional resources is intentional: it lets the document
       // finish while preventing access to internal infrastructure.
       await route.abort("blockedbyclient");
+    }
+  };
+}
+
+/**
+ * WebSocket traffic is separate from HTTP request routing in Playwright.
+ * The handler is installed before pages are created; a routed socket does
+ * not connect until `connectToServer()` is called.
+ */
+export function createScannerWebSocketInterception(
+  policy: ScannerNetworkPolicy,
+  hooks: ScannerWebSocketInterceptionHooks
+): (route: InterceptedWebSocketRoute) => Promise<void> {
+  return async (route) => {
+    try {
+      await policy.assertWebSocketAllowed(route.url());
+      route.connectToServer();
+    } catch (error) {
+      const blocked = error instanceof ScannerNetworkPolicyError
+        ? error
+        : new ScannerNetworkPolicyError("UNSAFE_ADDRESS");
+      hooks.onBlockedWebSocket(route.url(), blocked);
+      await route.close({ code: 1008, reason: NETWORK_DESTINATION_BLOCKED });
     }
   };
 }

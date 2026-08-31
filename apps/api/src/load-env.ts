@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-/** Loads `../.env` without relying on tsx --env-file (avoids UTF-8 BOM issues on Windows). */
+/** Loads the root `.env` without relying on tsx --env-file (avoids UTF-8 BOM
+ * issues on Windows). The root file is shared by the local services. */
 export function loadEnvFile(): void {
-  const envPath = path.resolve(__dirname, "..", ".env");
+  const envPath = path.resolve(__dirname, "..", "..", "..", ".env");
   if (!fs.existsSync(envPath)) return;
   const text = fs.readFileSync(envPath).toString("utf8").replace(/^\uFEFF/, "");
   for (const line of text.split(/\r?\n/)) {

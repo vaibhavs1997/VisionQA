@@ -12,7 +12,7 @@ async function main() {
   const metrics = createMetricsRegistry();
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  await runMigrations(pool);
+  if ((process.env.AUTH_STORE ?? "postgres") !== "mongo") await runMigrations(pool);
 
   const storage = new LocalFilesystemObjectStorage({
     rootDir: path.resolve(process.env.STORAGE_ROOT_DIR ?? "./storage-data"),

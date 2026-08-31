@@ -3,6 +3,7 @@ dist/
 *.tsbuildinfo
 scan-output/
 .next/
+.next-dev/
 apps/api/data/
 .DS_Store
 *.log

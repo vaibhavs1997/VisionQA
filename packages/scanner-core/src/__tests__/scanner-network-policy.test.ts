@@ -34,6 +34,13 @@ describe("ScannerNetworkPolicy", () => {
     await expectBlocked(policy, "not a URL", "INVALID_URL");
   });
 
+  it("applies the same address rules to ws and wss destinations", async () => {
+    const policy = policyFor(["8.8.8.8"]);
+    await expect(policy.assertWebSocketAllowed("wss://public.example/socket")).resolves.toBeInstanceOf(URL);
+    await expectBlocked(policy, "ws://127.0.0.1/internal", "UNSUPPORTED_PROTOCOL");
+    await expect(policy.assertWebSocketAllowed("ws://127.0.0.1/internal")).rejects.toBeInstanceOf(ScannerNetworkPolicyError);
+  });
+
   it("blocks localhost and all required IPv4 private, link-local, multicast, and unspecified ranges", async () => {
     const policy = policyFor([]);
     for (const host of ["localhost", "foo.localhost", "127.1.2.3", "10.0.0.1", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254", "0.0.0.0", "224.0.0.1"]) {

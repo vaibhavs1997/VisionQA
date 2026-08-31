@@ -12,6 +12,12 @@ body {
   font-feature-settings: "cv11", "ss01";
 }
 
+.auth-grid {
+  background-image: linear-gradient(rgba(20, 184, 166, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 184, 166, 0.08) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, black, transparent 75%);
+}
+
 ::selection {
   background: theme("colors.signal.soft");
   color: theme("colors.signal.ink");

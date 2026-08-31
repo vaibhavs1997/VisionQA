@@ -15,11 +15,13 @@
     "@ui-quality/queue": "0.1.0",
     "@ui-quality/storage": "0.1.0",
     "@ui-quality/observability": "0.1.0",
-    "@ui-quality/crawler": "0.1.0"
+    "@ui-quality/crawler": "0.1.0",
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "typescript": "^5.5.4",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
     "tsx": "^4.16.5"
   }
 }

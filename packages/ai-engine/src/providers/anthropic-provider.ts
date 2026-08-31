@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { requestWithPolicy, ScannerNetworkPolicy } from "@ui-quality/scanner-core";
 import { AiProvider, AiValidationRequest, AiCallRecord } from "../types";
 import { buildValidationPrompt, VALIDATE_PROMPT_VERSION } from "../prompts/validate-visual-issue.prompt";
 import { buildExplainPrompt, EXPLAIN_PROMPT_VERSION } from "../prompts/explain-issue.prompt";
@@ -11,6 +12,8 @@ export interface AnthropicProviderOptions {
    * provider rate card; this tool never hardcodes billing-accurate figures. */
   costPerKInputTokensUsd?: number;
   costPerKOutputTokensUsd?: number;
+  /** Allows scanner workers to share their centralized egress policy. */
+  networkPolicy?: ScannerNetworkPolicy;
 }
 
 function readImageBase64(path: string): string {
@@ -31,6 +34,7 @@ export class AnthropicProvider implements AiProvider {
   private readonly apiKey: string;
   private readonly costPerKInput: number;
   private readonly costPerKOutput: number;
+  private readonly networkPolicy: ScannerNetworkPolicy;
 
   constructor(options: AnthropicProviderOptions = {}) {
     const apiKey = options.apiKey ?? process.env.ANTHROPIC_API_KEY;
@@ -43,6 +47,7 @@ export class AnthropicProvider implements AiProvider {
     this.model = options.model ?? "claude-sonnet-5";
     this.costPerKInput = options.costPerKInputTokensUsd ?? 0.003;
     this.costPerKOutput = options.costPerKOutputTokensUsd ?? 0.015;
+    this.networkPolicy = options.networkPolicy ?? new ScannerNetworkPolicy();
   }
 
   private async call(
@@ -63,9 +68,9 @@ export class AnthropicProvider implements AiProvider {
     }
     content.push({ type: "text", text: user });
 
-    let response: Response;
+    let response: { status(): number; body(): Promise<Buffer> };
     try {
-      response = await fetch("https://api.anthropic.com/v1/messages", {
+      response = await requestWithPolicy(this.networkPolicy, "https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -95,14 +100,14 @@ export class AnthropicProvider implements AiProvider {
     }
 
     const latencyMs = Date.now() - started;
-    if (!response.ok) {
+    if (response.status() < 200 || response.status() >= 300) {
       return {
         raw: null,
         call: { requestKind: kind, issueType, provider: this.name, model: this.model, latencyMs, succeeded: false },
       };
     }
 
-    const data = (await response.json()) as {
+    const data = JSON.parse((await response.body()).toString("utf-8")) as {
       content: Array<{ type: string; text?: string }>;
       usage?: { input_tokens: number; output_tokens: number };
     };

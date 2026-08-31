@@ -1,0 +1,10 @@
+{
+  // Show files excluded by .gitignore and common IDE exclude patterns.
+  "explorer.excludeGitIgnore": false,
+  "files.exclude": {},
+  "search.exclude": {},
+  "files.watcherExclude": {},
+  "search.useIgnoreFiles": false,
+  "search.useGlobalIgnoreFiles": false,
+  "git.untrackedChanges": "mixed"
+}

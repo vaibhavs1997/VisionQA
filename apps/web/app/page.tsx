@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { api } from "@/lib/api-client";
-import { CreateWorkspaceForm } from "@/components/create-workspace-form";
-import { LogoutButton } from "@/components/logout-button";
+import { CreateWorkspaceForm } from "@/components/workspaces/create-workspace-form";
+import { LogoutButton } from "@/components/auth/logout-button";
 import { BrandMark } from "@/components/ui/brand-mark";
 
 export default async function WorkspacePickerPage() {

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { checkRateLimit, resetRateLimits } from "../services/rate-limiter";
 
 // Real Redis required — no mocking, same convention as

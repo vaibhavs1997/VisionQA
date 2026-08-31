@@ -268,11 +268,17 @@ UI_SCAN_CHROMIUM_PATH=/path/to/chromium npx tsx benchmarks/src/run-ai-demo.ts
 
 ```
 apps/cli/                   CLI entrypoint (commander) + scan command
+apps/api/                   Fastify API, auth, route handlers, and services
+apps/scanner-worker/        Queue worker and durable scan-job pipeline
+apps/web/                   Next.js UI, grouped by auth/workspaces/projects/scans/issues
 packages/shared/             PageContext, Universal Issue Object, viewport presets
 packages/scanner-core/       URL Security Guard, Browser Adapter, PageContext Collector
 packages/detectors/          33 detectors (image/network/layout/accessibility/technical/content/seo) + plugin registry
 packages/issue-engine/       Validator, Deduplicator, Scoring, Responsive Delta, Assembler, JSON + HTML report writers
 packages/ai-engine/          Provider-agnostic AI layer: providers, prompts, schemas, crop/annotation/context builders, redaction, cost tracker
+packages/database/           Postgres client, repositories, migrations, and maintenance commands
+packages/storage/            Object-storage interface and local/S3-compatible adapters
+packages/queue/               BullMQ/Redis queue integration
 packages/ocr/                Real tesseract.js-based OCR adapter (not wired into any detector by default)
 benchmarks/pages/            11 fixture HTML pages with planted defects (+2 clean controls)
 benchmarks/expected/         Expected-issues manifest used to score the benchmark
@@ -611,7 +617,7 @@ each service actually reads.
 
 **Frontend redesign (`apps/web`).** New design system: a cool
 graphite/paper palette instead of a generic default, a "viewfinder"
-corner-bracket motif (`.viewfinder` CSS + `<ViewfinderFrame>`) reused
+corner-bracket motif (`.viewfinder` CSS) reused
 throughout the UI that echoes the scanner's own bounding-box annotations
 on flagged elements, a sidebar app shell, an instrument-style score
 panel, and a real multi-step scan-progress timeline instead of a single
